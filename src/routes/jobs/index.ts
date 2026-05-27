@@ -50,6 +50,24 @@ router.post('/', async (req, res, next) => {
       }
     }
 
+    // policy-pack is org-scoped singleton — no two can run concurrently per org
+    if (jobType === 'policy-pack') {
+      const { data: existing, error: dedupErr } = await serviceClient
+        .from('ai_jobs')
+        .select('id')
+        .in('status', ['pending', 'running'])
+        .eq('job_type', 'policy-pack')
+        .eq('org_id', orgId)
+        .limit(1)
+        .maybeSingle()
+
+      if (dedupErr) return next(dedupErr)
+
+      if (existing) {
+        return res.json({ jobId: existing.id, deduplicated: true })
+      }
+    }
+
     const { data, error } = await serviceClient
       .from('ai_jobs')
       .insert({ org_id: orgId, user_id: userId, job_type: jobType, payload })
