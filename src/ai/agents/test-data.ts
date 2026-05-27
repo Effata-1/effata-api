@@ -1,4 +1,5 @@
 import { anthropic, MODEL, AI_TIMEOUT_MS } from '../../lib/anthropic'
+import { parseAiJson } from '../../lib/parse-json'
 
 const SYSTEM_PROMPT = `You are a DLP test data generator. Produce realistic but entirely synthetic (fake) data for testing Data Loss Prevention policies. Respond ONLY with raw JSON — no markdown, no prose, no code blocks.
 
@@ -58,8 +59,7 @@ export async function generateTestData(
     }
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
-    const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
-    const parsed = JSON.parse(clean) as GeneratedData
+    const parsed = parseAiJson<GeneratedData>(text)
 
     return {
       result: {

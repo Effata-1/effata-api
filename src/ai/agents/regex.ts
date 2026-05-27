@@ -1,4 +1,5 @@
 import { anthropic, MODEL, AI_TIMEOUT_MS } from '../../lib/anthropic'
+import { parseAiJson } from '../../lib/parse-json'
 
 const SYSTEM_PROMPT = `You are a DLP (Data Loss Prevention) regex expert.
 When given a description of what to match, respond ONLY with a valid JSON object.
@@ -73,8 +74,7 @@ export async function generateRegex(prompt: string): Promise<{ result: AiRegexRe
     )
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
-    const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
-    const parsed = JSON.parse(clean) as AiRegexResult
+    const parsed = parseAiJson<AiRegexResult>(text)
 
     const title = typeof parsed.title === 'string' && parsed.title.trim()
       ? parsed.title.trim()

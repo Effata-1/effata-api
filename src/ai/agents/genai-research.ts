@@ -1,4 +1,5 @@
 import { anthropic, MODEL, AI_TIMEOUT_MS } from '../../lib/anthropic'
+import { parseAiJson } from '../../lib/parse-json'
 
 const SYSTEM_PROMPT = `You are a DLP security researcher. You evaluate GenAI applications from the personal/consumer tier perspective — the free or standard plan that employees actually use without IT provisioning.
 Respond ONLY with valid JSON. No markdown, no prose, no code blocks.
@@ -71,9 +72,8 @@ Return a JSON object with exactly this structure:
     )
 
     const raw = response.content[0].type === 'text' ? response.content[0].text : ''
-    const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
     return {
-      result: JSON.parse(text),
+      result: parseAiJson(raw),
       inputTokens:  response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
     }
@@ -109,10 +109,9 @@ If this is not a real, identifiable GenAI application, return the JSON value nul
       { signal: controller.signal },
     )
 
-    const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : 'null'
-    const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim() || 'null'
+    const raw = response.content[0].type === 'text' ? response.content[0].text : 'null'
     return {
-      result: JSON.parse(text),
+      result: parseAiJson(raw, 'null'),
       inputTokens:  response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
     }
@@ -156,9 +155,8 @@ Only include apps with significant enterprise adoption or strong growth trajecto
     )
 
     const raw = response.content[0].type === 'text' ? response.content[0].text : '[]'
-    const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim() || '[]'
     return {
-      result: JSON.parse(text) as unknown[],
+      result: parseAiJson<unknown[]>(raw, '[]'),
       inputTokens:  response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
     }

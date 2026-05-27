@@ -1,4 +1,5 @@
 import { anthropic, MODEL, AI_TIMEOUT_MS } from '../../lib/anthropic'
+import { parseAiJson } from '../../lib/parse-json'
 
 const SYSTEM_PROMPT = `You are a DLP data classification expert. Given an organisation's classification labels and a list of data types, suggest the most appropriate classification label for each data type. Respond ONLY with a valid JSON array. No markdown, no explanation outside the JSON.`
 
@@ -50,9 +51,8 @@ Return JSON array:
       { signal: controller.signal },
     )
 
-    const raw  = response.content[0].type === 'text' ? response.content[0].text : '[]'
-    const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim() || '[]'
-    const parsed = JSON.parse(text) as ClassificationSuggestion[]
+    const raw    = response.content[0].type === 'text' ? response.content[0].text : '[]'
+    const parsed = parseAiJson<ClassificationSuggestion[]>(raw, '[]')
 
     return {
       result:       parsed,

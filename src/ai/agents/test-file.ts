@@ -1,4 +1,5 @@
 import { anthropic, MODEL, AI_TIMEOUT_MS } from '../../lib/anthropic'
+import { parseAiJson } from '../../lib/parse-json'
 
 const SYSTEM_PROMPT = `You are a DLP testing file generator. Create realistic test files containing clearly-marked synthetic sensitive data for DLP control validation.
 
@@ -57,8 +58,7 @@ export async function generateTestFile(
     )
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
-    const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
-    const parsed = JSON.parse(clean) as GeneratedFileResult
+    const parsed = parseAiJson<GeneratedFileResult>(text)
 
     return {
       result: parsed,

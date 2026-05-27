@@ -1,4 +1,5 @@
 import { anthropic, MODEL, AI_TIMEOUT_MS } from '../../lib/anthropic'
+import { parseAiJson } from '../../lib/parse-json'
 
 const SYSTEM = `You are a DLP (Data Loss Prevention) product expert. When given a tool name, respond with ONLY a valid JSON object — no markdown, no prose, no code fences.
 
@@ -48,11 +49,10 @@ export async function reviewDlpTool(
       { signal: controller.signal },
     )
 
-    const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
-    const json = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
+    const raw = response.content[0].type === 'text' ? response.content[0].text : ''
 
     return {
-      result:       JSON.parse(json),
+      result:       parseAiJson(raw),
       inputTokens:  response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
     }

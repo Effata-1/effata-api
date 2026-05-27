@@ -1,4 +1,5 @@
 import { anthropic, MODEL, AI_TIMEOUT_MS } from '../../lib/anthropic'
+import { parseAiJson } from '../../lib/parse-json'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -83,8 +84,7 @@ export async function evidenceChat(
     )
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
-    const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
-    const parsed = JSON.parse(clean) as AIChatResponse
+    const parsed = parseAiJson<AIChatResponse>(text)
 
     return {
       result: {
