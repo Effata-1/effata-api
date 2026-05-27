@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireRole } from '../../middleware/rbac'
 import { serviceClient } from '../../lib/supabase'
 import { logAuditEvent } from '../../lib/audit-log'
+import { config } from '../../config'
 
 const router = Router()
 
@@ -73,9 +74,10 @@ router.post('/invite', requireRole('admin'), async (req, res, next) => {
     }
 
     const { error: inviteErr } = await serviceClient.auth.admin.inviteUserByEmail(email, {
+      ...(config.SITE_URL && { redirectTo: `${config.SITE_URL}/auth/callback` }),
       data: { org_id: orgId, role },
     })
-    if (inviteErr) return next(inviteErr)
+    if (inviteErr) return res.status(400).json({ error: inviteErr.message })
 
     void logAuditEvent({
       action:     'team.member_invited',

@@ -6,6 +6,7 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY:       z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   ALLOWED_ORIGINS:         z.string().min(1).default('http://localhost:3000'),
+  SITE_URL:                z.string().url().optional(),
   CRON_API_KEY:            z.string().min(1),
   PORT:                    z.coerce.number().default(3001),
 })
