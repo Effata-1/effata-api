@@ -218,3 +218,74 @@ export function computeTrustScore(
 export function classificationLabel(key: string): string {
   return CLASSIFICATION_LABELS[key] ?? '—'
 }
+
+// ── AI response parsers ───────────────────────────────────────────────────────
+// Clamp helpers ensure AI output that drifts outside enum values doesn't crash
+// the scoring pipeline — unknown values fall back to 'no-published'.
+
+const VALID_FIELD_VALUES: readonly string[] = [
+  'yes', 'no', 'partial', 'enterprise-only', 'tier-dependent',
+  'configurable', 'no-published', 'na',
+]
+const VALID_DLP_VALUES: readonly string[] = [
+  'enforcement', 'monitoring', 'partial', 'no-published', 'not-supported',
+]
+
+function clampField(v: unknown): FieldValue {
+  return VALID_FIELD_VALUES.includes(v as string) ? (v as FieldValue) : 'no-published'
+}
+function clampDLP(v: unknown): DLPValue {
+  return VALID_DLP_VALUES.includes(v as string) ? (v as DLPValue) : 'no-published'
+}
+
+export function parseFields(raw: Record<string, unknown>): AppFields {
+  return {
+    dpa_available:              clampField(raw.dpa_available),
+    customer_owns_data:         clampField(raw.customer_owns_data),
+    trains_on_customer_data:    clampField(raw.trains_on_customer_data),
+    opt_out_of_training:        clampField(raw.opt_out_of_training),
+    data_retention:             clampField(raw.data_retention),
+    data_deletion:              clampField(raw.data_deletion),
+    data_residency:             clampField(raw.data_residency),
+    subprocessor_list:          clampField(raw.subprocessor_list),
+    pii_sharing_third_parties:  clampField(raw.pii_sharing_third_parties),
+    data_sharing_genai_vendor:  clampField(raw.data_sharing_genai_vendor),
+    soc2:                       clampField(raw.soc2),
+    iso27001:                   clampField(raw.iso27001),
+    iso27018:                   clampField(raw.iso27018),
+    fedramp:                    clampField(raw.fedramp),
+    pci_dss:                    clampField(raw.pci_dss),
+    hipaa_baa:                  clampField(raw.hipaa_baa),
+    encryption_at_rest:         clampField(raw.encryption_at_rest),
+    encryption_in_transit:      clampField(raw.encryption_in_transit),
+    tenant_segregation:         clampField(raw.tenant_segregation),
+    model_provider_clear:       clampField(raw.model_provider_clear),
+    prompt_retention_controls:  clampField(raw.prompt_retention_controls),
+    connectors_agents_risk:     clampField(raw.connectors_agents_risk),
+  }
+}
+
+export function parseDLP(raw: Record<string, unknown>): DLPActivities {
+  return {
+    post_prompt:    clampDLP(raw.post_prompt),
+    upload:         clampDLP(raw.upload),
+    login_instance: clampDLP(raw.login_instance),
+    edit:           clampDLP(raw.edit),
+    response:       clampDLP(raw.response),
+    download:       clampDLP(raw.download),
+    attach:         clampDLP(raw.attach),
+  }
+}
+
+export function parseBreach(raw: Record<string, unknown>): BreachInfo {
+  return {
+    recent_breach:      clampField(raw.recent_breach),
+    older_breach:       clampField(raw.older_breach),
+    breach_disclosed:   clampField(raw.breach_disclosed),
+    source_disclosure:  clampField(raw.source_disclosure),
+    breach_remediated:  clampField(raw.breach_remediated),
+    breach_name:        typeof raw.breach_name === 'string' ? raw.breach_name : null,
+    breach_date:        typeof raw.breach_date === 'string' ? raw.breach_date : null,
+    breach_description: typeof raw.breach_description === 'string' ? raw.breach_description : null,
+  }
+}

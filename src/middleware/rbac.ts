@@ -32,3 +32,17 @@ export function requireRole(minRole: 'admin' | 'analyst') {
     next()
   }
 }
+
+export async function checkRoleLevel(
+  userId: string,
+  orgId:  string,
+  minRole: 'admin' | 'analyst',
+): Promise<boolean> {
+  const { data } = await serviceClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .eq('org_id', orgId)
+    .single()
+  return (ROLE_RANK[data?.role as string ?? ''] ?? -1) >= ROLE_RANK[minRole]
+}

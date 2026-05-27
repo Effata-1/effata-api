@@ -8,18 +8,35 @@ const router = Router()
 
 router.post('/', async (_req, res, next) => {
   try {
-    const result = await serviceClient.functions.invoke('genai-refresh')
+    // Dedup: skip if a genai-refresh job is already pending or running
+    const { count, error: countErr } = await serviceClient
+      .from('ai_jobs')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['pending', 'running'])
+      .eq('job_type', 'genai-refresh')
 
-    if (result.error) return next(result.error)
+    if (countErr) return next(countErr)
 
-    void logAuditEvent({
-      action:  'genai_refresh.triggered',
-      orgId:   SYSTEM_ORG,
-      userId:  null,
-      details: { run_type: 'cron', source: 'railway' },
+    if ((count ?? 0) > 0) {
+      return res.json({ status: 'already_running' })
+    }
+
+    const { error } = await serviceClient.from('ai_jobs').insert({
+      org_id:   SYSTEM_ORG,
+      job_type: 'genai-refresh',
+      payload:  {},
     })
 
-    res.json({ status: 'ok', ...result.data })
+    if (error) return next(error)
+
+    void logAuditEvent({
+      action:  'job.created',
+      orgId:   SYSTEM_ORG,
+      userId:  null,
+      details: { job_type: 'genai-refresh', run_type: 'cron', source: 'railway' },
+    })
+
+    res.json({ status: 'queued' })
   } catch (err) {
     next(err)
   }

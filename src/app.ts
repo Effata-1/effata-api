@@ -5,6 +5,7 @@ import { validateToken, validateCronKey } from './middleware/auth'
 import healthRouter              from './routes/health'
 import aiRouter                  from './routes/ai/index'
 import dataRouter                from './routes/data/index'
+import jobsRouter                from './routes/jobs/index'
 import internalComplianceRouter  from './routes/internal/compliance'
 import internalGenaiRefreshRouter from './routes/internal/genai-refresh'
 
@@ -18,6 +19,7 @@ app.use(express.json({ limit: '1mb' }))
 app.use('/health',                              healthRouter)
 app.use('/api/ai',                              aiRouter)
 app.use('/api/data',                            validateToken, dataRouter)
+app.use('/api/jobs',                            validateToken, jobsRouter)
 app.use('/api/internal/compliance-check',       validateCronKey, internalComplianceRouter)
 app.use('/api/internal/genai-refresh',          validateCronKey, internalGenaiRefreshRouter)
 

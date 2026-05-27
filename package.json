@@ -5,8 +5,10 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:worker": "tsx watch src/worker/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:worker": "node dist/worker/index.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
