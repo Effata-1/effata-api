@@ -75,7 +75,7 @@ Respond ONLY with valid JSON in this exact shape:
     const response = await anthropic.messages.create(
       {
         model:      MODEL,
-        max_tokens: 1024,
+        max_tokens: 4096,
         system:     SYSTEM_PROMPT,
         messages:   [{ role: 'user', content: prompt }],
       },
