@@ -11,7 +11,7 @@ export interface AuditEventParams {
 
 export async function logAuditEvent(params: AuditEventParams): Promise<void> {
   try {
-    await serviceClient.from('audit_logs').insert({
+    const { error } = await serviceClient.from('audit_logs').insert({
       org_id:      params.orgId,
       user_id:     params.userId     ?? null,
       user_email:  null,
@@ -23,7 +23,8 @@ export async function logAuditEvent(params: AuditEventParams): Promise<void> {
       new_value:   null,
       details:     params.details    ?? {},
     })
-  } catch {
-    // Fire-and-forget — never throw, never block the response
+    if (error) console.error('[audit-log] insert failed:', error.message, '| action:', params.action)
+  } catch (err) {
+    console.error('[audit-log] exception:', err instanceof Error ? err.message : err, '| action:', params.action)
   }
 }
