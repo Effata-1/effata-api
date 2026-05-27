@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { anthropic, MODEL, AI_TIMEOUT_MS } from '../../lib/anthropic'
+import { anthropic, MODEL } from '../../lib/anthropic'
 import { parseAiJson } from '../../lib/parse-json'
 
 export interface PolicyPackInput {
@@ -51,11 +51,8 @@ const SYSTEM_PROMPT = `You are a senior DLP architect generating targeted DLP po
 export async function generatePolicyPack(
   input: PolicyPackInput,
 ): Promise<{ result: PolicyPackResult; inputTokens: number; outputTokens: number }> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
-
-  try {
-    const criticalGaps = input.coverageGaps.filter(g => g.severity === 'critical' || g.severity === 'high')
+  // No per-request abort — this runs inside a 15-minute job runner timeout
+  const criticalGaps = input.coverageGaps.filter(g => g.severity === 'critical' || g.severity === 'high')
     const allGaps      = input.coverageGaps
 
     const prompt = `You are a senior DLP architect generating targeted GenAI DLP policy recommendations for an organisation.
@@ -117,15 +114,12 @@ Respond ONLY with valid JSON in this exact shape:
   "summary": string
 }`
 
-    const response = await anthropic.messages.create(
-      {
-        model:      MODEL,
-        max_tokens: 4096,
-        system:     SYSTEM_PROMPT,
-        messages:   [{ role: 'user', content: prompt }],
-      },
-      { signal: controller.signal },
-    )
+    const response = await anthropic.messages.create({
+      model:      MODEL,
+      max_tokens: 4096,
+      system:     SYSTEM_PROMPT,
+      messages:   [{ role: 'user', content: prompt }],
+    })
 
     const raw    = response.content[0].type === 'text' ? response.content[0].text : ''
     const parsed = parseAiJson<unknown>(raw)
@@ -136,7 +130,4 @@ Respond ONLY with valid JSON in this exact shape:
       inputTokens:  response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
     }
-  } finally {
-    clearTimeout(timer)
-  }
 }
