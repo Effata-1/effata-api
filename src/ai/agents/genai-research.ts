@@ -70,7 +70,8 @@ Return a JSON object with exactly this structure:
       { signal: controller.signal },
     )
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const raw = response.content[0].type === 'text' ? response.content[0].text : ''
+    const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
     return {
       result: JSON.parse(text),
       inputTokens:  response.usage.input_tokens,
@@ -108,7 +109,8 @@ If this is not a real, identifiable GenAI application, return the JSON value nul
       { signal: controller.signal },
     )
 
-    const text = response.content[0].type === 'text' ? response.content[0].text.trim() : 'null'
+    const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : 'null'
+    const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim() || 'null'
     return {
       result: JSON.parse(text),
       inputTokens:  response.usage.input_tokens,
@@ -153,7 +155,8 @@ Only include apps with significant enterprise adoption or strong growth trajecto
       { signal: controller.signal },
     )
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+    const raw = response.content[0].type === 'text' ? response.content[0].text : '[]'
+    const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim() || '[]'
     return {
       result: JSON.parse(text) as unknown[],
       inputTokens:  response.usage.input_tokens,
