@@ -132,7 +132,7 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
           { onConflict: 'app_id,mode' },
         )
 
-      if (profileErr) return next(profileErr)
+      if (profileErr) return next(new Error(profileErr.message ?? 'Failed to save app profile'))
 
       fields      = researched.fields
       dlp         = researched.dlp
