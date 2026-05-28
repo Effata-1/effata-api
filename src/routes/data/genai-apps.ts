@@ -169,6 +169,7 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
         app_id:                  app.app_id,
         app_name:                app.app_name,
         vendor:                  app.vendor,
+        domain:                  app.domain,
         app_type:                app.app_type,
         logo_letter:             app.logo_letter,
         logo_bg:                 app.logo_bg,
