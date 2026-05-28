@@ -63,6 +63,18 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
 
       const identified = result as IdentifiedApp
 
+      // 2b. Guard: check if an app with the same name already exists (different app_id)
+      //     This prevents duplicates when Claude generates a different app_id than what's in the DB.
+      const { data: nameMatch } = await serviceClient
+        .from('genai_apps')
+        .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg')
+        .ilike('app_name', identified.app_name)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (nameMatch) {
+        app = nameMatch as IdentifiedApp
+      } else {
       // 3. Upsert into genai_apps
       const { data: inserted, error: upsertErr } = await serviceClient
         .from('genai_apps')
@@ -84,6 +96,7 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
 
       app = inserted as IdentifiedApp
       isNewToDb = true
+      } // end nameMatch else
     }
 
     // 4. Check for existing profile and freshness
