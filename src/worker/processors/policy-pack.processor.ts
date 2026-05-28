@@ -35,7 +35,7 @@ export async function policyPackProcessor(ctx: ProcessorContext): Promise<Record
   await ctx.setProgress(4, 0)
 
   // Step 1 — Fetch all org data
-  const [profileResult, reviewResult, classResult, existingResult] = await Promise.all([
+  const [profileResult, reviewResult, classResult, existingResult, customerLabelsResult] = await Promise.all([
     serviceClient
       .from('onboarding_profiles')
       .select('industry, regions, tools, data_categories, top_priorities, policy_presence, policy_mode')
@@ -59,6 +59,12 @@ export async function policyPackProcessor(ctx: ProcessorContext): Promise<Record
       .from('org_genai_policies')
       .select('policy_family, priority')
       .eq('org_id', orgId),
+
+    serviceClient
+      .from('org_customer_sensitivity_labels')
+      .select('display_name, system_level')
+      .eq('org_id', orgId)
+      .eq('active', true),
   ])
 
   const profile = profileResult.data
@@ -69,6 +75,7 @@ export async function policyPackProcessor(ctx: ProcessorContext): Promise<Record
 
   const classRows      = classResult.data ?? []
   const existingRows   = existingResult.data ?? []
+  const customerLabels = (customerLabelsResult.data ?? []) as Array<{ display_name: string; system_level: string | null }>
 
   const countByClass = (cls: string) =>
     classRows.filter((r: { customer_classification: string }) => r.customer_classification === cls).length
@@ -108,6 +115,8 @@ export async function policyPackProcessor(ctx: ProcessorContext): Promise<Record
       prohibited:               countByClass('prohibited'),
     },
     existingPolicyFamilies,
+    hasCustomerLabels:    customerLabels.length > 0,
+    customerLabelSummary: customerLabels.map(l => `${l.display_name}${l.system_level ? ` (${l.system_level})` : ''}`),
   })
 
   await ctx.setProgress(4, 2)

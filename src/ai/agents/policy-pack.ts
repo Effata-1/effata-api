@@ -21,6 +21,8 @@ export interface PolicyPackInput {
     prohibited:               number
   }
   existingPolicyFamilies: string[]
+  hasCustomerLabels:      boolean
+  customerLabelSummary:   string[]
 }
 
 const VALID_ACTIONS = ['allow', 'monitor', 'alert', 'coach', 'coach-ack', 'coach-just', 'block'] as const
@@ -79,6 +81,12 @@ Prohibited Apps: ${input.appCounts.prohibited}
 ## Existing Policy Families (do NOT duplicate these)
 ${JSON.stringify(input.existingPolicyFamilies)}
 
+## Sensitivity Label Detection (Upload Metadata Control)
+Customer sensitivity labels configured: ${input.hasCustomerLabels ? input.customerLabelSummary.join(', ') : 'NONE'}
+${input.hasCustomerLabels
+  ? 'Generate at least one policy with policy_family="GenAI Label Detection". These apply only to file uploads — label/metadata detection does NOT apply to typed prompts. Do NOT duplicate high-risk content detection already handled by "GenAI Content Detection" policies.'
+  : 'Do NOT generate label detection policies — no sensitivity labels are configured for this organisation.'}
+
 ## Task
 Generate 3–7 targeted GenAI DLP policy recommendations that:
 1. Directly address the highest-severity coverage gaps above
@@ -86,12 +94,14 @@ Generate 3–7 targeted GenAI DLP policy recommendations that:
 3. Reflect the priority data categories and top priorities
 4. Do NOT duplicate any existing policy family listed above
 5. Are ordered by urgency (priority 1 = most urgent)
+6. If sensitivity labels are configured, include label detection policies (policy_family="GenAI Label Detection")
 
 Policy type rules (MUST follow):
 - "prohibited" policies MUST use primary_action "block"
 - "approved-use" policies MUST use primary_action "allow"
 - "data-handling" policies typically use "monitor", "alert", "coach", "coach-ack", "coach-just", or "block"
 - "usage" policies typically use "monitor", "alert", "coach", or "allow"
+- Label detection ("GenAI Label Detection") policies are always "data-handling" type
 
 Valid primary_action values: ${VALID_ACTIONS.join(' | ')}
 Valid data_classification_label values: ${VALID_LABELS.join(' | ')}
