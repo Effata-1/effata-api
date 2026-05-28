@@ -16,13 +16,18 @@ const evaluateSchema = z.object({
 const PROFILE_FRESHNESS_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 interface IdentifiedApp {
-  app_id:       string
-  app_name:     string
-  vendor:       string
-  domain:       string
-  app_type:     string
-  logo_letter:  string
-  logo_bg:      string
+  app_id:            string
+  app_name:          string
+  vendor:            string
+  domain:            string
+  app_type:          string
+  logo_letter:       string
+  logo_bg:           string
+  description?:      string | null
+  headquarters?:     string | null
+  founded_year?:     number | null
+  employee_count?:   string | null
+  primary_use_cases?: string[] | null
 }
 
 interface ResearchedProfile {
@@ -44,7 +49,7 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
     // 1. Search catalog by exact app_id first, then by name
     const { data: existingApps } = await serviceClient
       .from('genai_apps')
-      .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg, status')
+      .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg, status, description, headquarters, founded_year, employee_count, primary_use_cases')
       .or(`app_id.eq.${searchTerm.toLowerCase().replace(/\s+/g, '-')},app_name.ilike.%${searchTerm}%`)
       .eq('status', 'active')
       .limit(1)
@@ -67,7 +72,7 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
       //     This prevents duplicates when Claude generates a different app_id than what's in the DB.
       const { data: nameMatch } = await serviceClient
         .from('genai_apps')
-        .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg')
+        .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg, description, headquarters, founded_year, employee_count, primary_use_cases')
         .ilike('app_name', identified.app_name)
         .eq('status', 'active')
         .maybeSingle()
@@ -87,7 +92,7 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
           },
           { onConflict: 'app_id' },
         )
-        .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg')
+        .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg, description, headquarters, founded_year, employee_count, primary_use_cases')
         .single()
 
       if (upsertErr || !inserted) {

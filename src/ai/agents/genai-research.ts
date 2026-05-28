@@ -99,7 +99,12 @@ Identify this specific application. Return a JSON object:
   "domain": "Primary domain e.g. chat.openai.com",
   "app_type": "One of: AI Assistant | Code Assistant | Image Generator | AI Writing | AI Search | AI Analytics | AI Communication | AI Productivity",
   "logo_letter": "Single uppercase letter for the logo",
-  "logo_bg": "Hex color matching the brand e.g. #10a37f"
+  "logo_bg": "Hex color matching the brand e.g. #10a37f",
+  "description": "2-3 sentence factual description of what the app does and its primary use cases in an enterprise context. Focus on what data employees share with it.",
+  "headquarters": "City, Country (e.g. San Francisco, USA) or null if unknown",
+  "founded_year": 2022,
+  "employee_count": "e.g. 1-50 | 51-200 | 201-500 | 501-2000 | 2001-10000 | 10000+ or null",
+  "primary_use_cases": ["array", "of", "3-5", "short", "use", "case", "strings"]
 }
 
 If this is not a real, identifiable GenAI application, return the JSON value null.`
@@ -143,7 +148,12 @@ Return a JSON array (may be empty if nothing significant to add):
     "domain": "app.example.com",
     "app_type": "one of: AI Assistant | Code Assistant | Image Generator | AI Writing | AI Search | AI Analytics | AI Communication | AI Productivity",
     "logo_letter": "Single uppercase letter",
-    "logo_bg": "A hex color code like #1a1a2e that suits the brand"
+    "logo_bg": "A hex color code like #1a1a2e that suits the brand",
+    "description": "2-3 sentence factual description of what the app does in an enterprise context.",
+    "headquarters": "City, Country or null",
+    "founded_year": null,
+    "employee_count": null,
+    "primary_use_cases": ["use case 1", "use case 2"]
   }
 ]
 
