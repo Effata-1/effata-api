@@ -23,6 +23,7 @@ interface IdentifiedApp {
   app_type:          string
   logo_letter:       string
   logo_bg:           string
+  logo_url?:         string | null
   description?:      string | null
   headquarters?:     string | null
   founded_year?:     number | null
@@ -81,18 +82,23 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
         app = nameMatch as IdentifiedApp
       } else {
       // 3. Upsert into genai_apps
+      // Build favicon URL from root domain so the frontend can use it directly without cascading.
+      const rootDomain = identified.domain.replace(/^https?:\/\//, '').split('/')[0].split('.').slice(-2).join('.')
+      const logoUrl = `https://www.google.com/s2/favicons?domain_url=https://${rootDomain}&sz=128`
+
       const { data: inserted, error: upsertErr } = await serviceClient
         .from('genai_apps')
         .upsert(
           {
             ...identified,
+            logo_url:        logoUrl,
             status:          'active',
             auto_researched: true,
             last_updated:    new Date().toISOString(),
           },
           { onConflict: 'app_id' },
         )
-        .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg, description, headquarters, founded_year, employee_count, primary_use_cases')
+        .select('app_id, app_name, vendor, domain, app_type, logo_letter, logo_bg, logo_url, description, headquarters, founded_year, employee_count, primary_use_cases')
         .single()
 
       if (upsertErr || !inserted) {
