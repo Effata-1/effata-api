@@ -88,9 +88,9 @@ const NEG: Record<string, number> = {
 
 const DLP_SCORE: Record<string, number> = {
   'enforcement':   100,
-  'monitoring':     80,
-  'partial':        60,
-  'no-published':   40,
+  'monitoring':     65,
+  'partial':        50,
+  'no-published':   30,
   'not-supported':   0,
 }
 
