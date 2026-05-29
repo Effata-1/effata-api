@@ -11,7 +11,7 @@ export async function policyCompileProcessor(ctx: ProcessorContext): Promise<Rec
   // Step 1 — Fetch all governance inputs in parallel
   const [
     catsResult, overridesResult, labelsResult,
-    customerLabelsResult, dataTypesResult, profileResult,
+    customerLabelsResult, orgDataTypesResult, catalogDataTypesResult, profileResult,
   ] = await Promise.all([
     serviceClient
       .from('org_genai_governance_categories')
@@ -33,11 +33,17 @@ export async function policyCompileProcessor(ctx: ProcessorContext): Promise<Rec
       .select('id, display_name, label_key, label_value, label_source, system_level, active')
       .eq('org_id', orgId),
 
+    // org_data_types has no slug/system_level — must join with catalog_data_types
     serviceClient
       .from('org_data_types')
-      .select('slug, name, system_level')
+      .select('id, name, catalog_data_type_id')
       .eq('org_id', orgId)
       .eq('is_in_scope', true),
+
+    serviceClient
+      .from('catalog_data_types')
+      .select('id, slug, name, system_level')
+      .eq('active', true),
 
     serviceClient
       .from('onboarding_profiles')
@@ -46,9 +52,19 @@ export async function policyCompileProcessor(ctx: ProcessorContext): Promise<Rec
       .maybeSingle(),
   ])
 
-  if (catsResult.error)          throw new Error(`Failed to fetch governance categories: ${catsResult.error.message}`)
-  if (labelsResult.error)        throw new Error(`Failed to fetch classification labels: ${labelsResult.error.message}`)
-  if (dataTypesResult.error)     throw new Error(`Failed to fetch data types: ${dataTypesResult.error.message}`)
+  if (catsResult.error)            throw new Error(`Failed to fetch governance categories: ${catsResult.error.message}`)
+  if (labelsResult.error)          throw new Error(`Failed to fetch classification labels: ${labelsResult.error.message}`)
+  if (orgDataTypesResult.error)    throw new Error(`Failed to fetch data types: ${orgDataTypesResult.error.message}`)
+  if (catalogDataTypesResult.error) throw new Error(`Failed to fetch catalog data types: ${catalogDataTypesResult.error.message}`)
+
+  // Join org_data_types → catalog_data_types to resolve slug and system_level
+  const catalogMap = new Map((catalogDataTypesResult.data ?? []).map(c => [c.id, c]))
+  const inScopeDataTypes = (orgDataTypesResult.data ?? []).flatMap(dt => {
+    if (!dt.catalog_data_type_id) return []
+    const cat = catalogMap.get(dt.catalog_data_type_id)
+    if (!cat) return []
+    return [{ slug: cat.slug, name: dt.name, system_level: cat.system_level }]
+  })
 
   await ctx.setProgress(5, 1)
 
@@ -58,7 +74,7 @@ export async function policyCompileProcessor(ctx: ProcessorContext): Promise<Rec
     controlMatrixOverrides:    overridesResult.data ?? [],
     classificationLabels:      labelsResult.data ?? [],
     customerSensitivityLabels: customerLabelsResult.data ?? [],
-    inScopeDataTypes:          dataTypesResult.data ?? [],
+    inScopeDataTypes,
     onboardingProfile: {
       tools:        profileResult.data?.tools        ?? [],
       channels:     profileResult.data?.channels     ?? undefined,
