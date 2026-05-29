@@ -1,4 +1,4 @@
-export type JobType = 'genai-refresh' | 'coverage-review' | 'evidence-report' | 'policy-pack' | 'policy-translate'
+export type JobType = 'genai-refresh' | 'coverage-review' | 'evidence-report' | 'policy-pack' | 'policy-translate' | 'policy-compile'
 
 export interface JobConfig {
   timeoutMs: number
@@ -11,6 +11,7 @@ export const JOB_CONFIG: Record<JobType, JobConfig> = {
   'evidence-report':  { timeoutMs:  5 * 60_000, minRole: 'analyst' },
   'policy-pack':      { timeoutMs: 15 * 60_000, minRole: 'admin'   },
   'policy-translate': { timeoutMs: 10 * 60_000, minRole: 'analyst' },
+  'policy-compile':   { timeoutMs:  5 * 60_000, minRole: 'analyst' },
 }
 
 const JOB_TYPES = Object.keys(JOB_CONFIG) as JobType[]

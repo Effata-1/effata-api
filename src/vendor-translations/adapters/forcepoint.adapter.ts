@@ -1,5 +1,6 @@
 import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction, actionToSeverity } from '../types'
+import { validateNeutralPolicy } from '../../neutral-policies/schema'
 
 export const ADAPTER_VERSION = '1.0.0'
 
@@ -14,10 +15,29 @@ export function translate(
   const unverifiedAreas: string[]   = []
   const testsRequired: string[]     = []
 
-  // Resolve effective actions (rule-level beats policy-level)
-  const uploadAction     = resolveAction(policy, 'upload')
-  const postPromptAction = resolveAction(policy, 'post_prompt')
-  const downloadAction   = resolveAction(policy, 'download')
+  // npj-first: use structured neutral policy when valid
+  const npj = policy.neutral_policy_json
+    ? validateNeutralPolicy(policy.neutral_policy_json)
+    : null
+  if (policy.neutral_policy_json && Object.keys(policy.neutral_policy_json).length > 0 && !npj) {
+    lossyMappings.push('neutral_policy_json failed schema validation — translated from legacy fields only. Re-generate policies for better accuracy.')
+  }
+
+  // Resolve effective actions (npj-first, legacy fallback)
+  const uploadAction     = npj
+    ? (npj.scope.activities.includes('upload')   ? npj.decision.mode : 'not-set')
+    : resolveAction(policy, 'upload')
+  const postPromptAction = npj
+    ? (npj.scope.activities.includes('post') || npj.scope.activities.includes('prompt_submit') ? npj.decision.mode : 'not-set')
+    : resolveAction(policy, 'post_prompt')
+  const downloadAction   = npj
+    ? (npj.scope.activities.includes('download') ? npj.decision.mode : 'not-set')
+    : resolveAction(policy, 'download')
+
+  if (npj) {
+    exactMappings.push('npj.scope.activities → Forcepoint activity types (exact)')
+    exactMappings.push('npj.decision.mode → Forcepoint action (exact)')
+  }
 
   // Primary action for the policy (most restrictive across activities)
   const primaryAction = [uploadAction, postPromptAction, downloadAction]
@@ -48,22 +68,36 @@ export function translate(
     testsRequired.push('Define a Forcepoint destination resource group containing all target GenAI apps (ChatGPT, Claude, Gemini, etc.).')
   }
 
-  // Classifiers from data classification label + rules
+  // Classifiers from npj conditions or legacy fields
   const classifiers: string[] = []
-  if (policy.data_classification_label && policy.data_classification_label !== 'all') {
-    classifiers.push(`Effata classification: ${policy.data_classification_label}`)
-    exactMappings.push('data_classification_label → classifier')
-  }
-  for (const rule of policy.rules) {
-    if (rule.data_type.startsWith('clabel:')) {
-      classifiers.push('Customer sensitivity label — configure as Forcepoint data identifier')
-      unverifiedAreas.push('Customer sensitivity label (clabel:) — tenant-specific MIP label parity requires Forcepoint configuration.')
-    } else if (rule.data_type !== 'all' && !classifiers.includes(rule.data_type)) {
-      classifiers.push(rule.data_type)
+  if (npj && npj.content.conditions.length > 0) {
+    for (const cond of npj.content.conditions) {
+      if (cond.type === 'data_type') {
+        classifiers.push(`Effata data type: ${cond.sensitivity} — ${cond.name}`)
+        exactMappings.push(`npj data_type condition [${cond.sensitivity}] → classifier`)
+      } else if (cond.type === 'classification_label') {
+        classifiers.push(`Classification label: ${cond.label_name} (${cond.label_source})`)
+        unverifiedAreas.push(`Customer sensitivity label "${cond.label_name}" — tenant-specific MIP/label parity requires Forcepoint configuration.`)
+      } else if (cond.type === 'filename') {
+        classifiers.push(`Filename pattern: ${cond.pattern}`)
+      }
     }
+  } else {
+    if (policy.data_classification_label && policy.data_classification_label !== 'all') {
+      classifiers.push(`Effata classification: ${policy.data_classification_label}`)
+      exactMappings.push('data_classification_label → classifier')
+    }
+    for (const rule of policy.rules) {
+      if (rule.data_type.startsWith('clabel:')) {
+        classifiers.push('Customer sensitivity label — configure as Forcepoint data identifier')
+        unverifiedAreas.push('Customer sensitivity label (clabel:) — tenant-specific MIP label parity requires Forcepoint configuration.')
+      } else if (rule.data_type !== 'all' && !classifiers.includes(rule.data_type)) {
+        classifiers.push(rule.data_type)
+      }
+    }
+    exactMappings.push('rules[].data_type → classifiers')
   }
   if (classifiers.length === 0) classifiers.push('All data')
-  exactMappings.push('rules[].data_type → classifiers')
 
   // Severity from resolved action
   const severity = actionToSeverity(primaryAction)

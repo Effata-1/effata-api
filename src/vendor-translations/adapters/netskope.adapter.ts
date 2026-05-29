@@ -1,5 +1,6 @@
 import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction } from '../types'
+import { validateNeutralPolicy } from '../../neutral-policies/schema'
 
 export const ADAPTER_VERSION = '3.0.0'
 
@@ -96,19 +97,14 @@ export function translate(
   const testsRequired: string[]     = []
   const nativePolicies: object[]    = []
 
-  // Resolve effective actions per activity (rule-level beats policy-level)
-  const postPromptAction = resolveAction(policy, 'post_prompt')
-  const uploadAction     = resolveAction(policy, 'upload')
-  const downloadAction   = resolveAction(policy, 'download')
-  const responseAction   = resolveAction(policy, 'response')
+  // ── Neutral policy JSON — use as primary source when valid ────────────────
+  const npj = policy.neutral_policy_json
+    ? validateNeutralPolicy(policy.neutral_policy_json)
+    : null
 
-  // Netskope RT policies do not have a "Response" activity — only Post/Upload/Download.
-  // AI output protection requires Netskope AI Access Security or a separate Download DLP policy.
-  if (responseAction !== 'not-set') {
-    unsupportedIntent.push(
-      `response activity action "${responseAction}" cannot be mapped — Netskope Real-time Protection policies ` +
-      `do not intercept AI-generated responses. For AI output protection, use Netskope AI Access Security ` +
-      `(separate product capability) or a Download activity policy to inspect content returned from the AI app.`,
+  if (policy.neutral_policy_json && Object.keys(policy.neutral_policy_json).length > 0 && !npj) {
+    lossyMappings.push(
+      'neutral_policy_json failed schema validation — translated from legacy fields only. Re-generate policies for better accuracy.',
     )
   }
 
@@ -131,29 +127,65 @@ export function translate(
     lossyMappings.push('No specific apps scoped — destination defaulted to Generative AI category. Define specific app instances in Netskope if needed.')
   }
 
-  // Activities list
+  // ── Activities and primary action ─────────────────────────────────────────
   const activities: string[] = []
-  const actionMap: Record<string, string> = {}
+  let mostRestrictive: string
 
-  if (postPromptAction !== 'not-set') { activities.push('Post');     actionMap['Post']     = postPromptAction }
-  if (uploadAction     !== 'not-set') { activities.push('Upload');   actionMap['Upload']   = uploadAction     }
-  if (downloadAction   !== 'not-set') { activities.push('Download'); actionMap['Download'] = downloadAction   }
-  if (activities.length === 0) activities.push('Upload', 'Post')
+  if (npj) {
+    // npj-first: activities come directly from structured scope — no guessing
+    if (npj.scope.activities.includes('post') || npj.scope.activities.includes('prompt_submit')) activities.push('Post')
+    if (npj.scope.activities.includes('upload'))   activities.push('Upload')
+    if (npj.scope.activities.includes('download')) activities.push('Download')
+    if (activities.length === 0) activities.push('Upload', 'Post')
 
-  exactMappings.push('post_prompt → activity Post')
-  exactMappings.push('upload → activity Upload')
-  exactMappings.push('download → activity Download')
+    // Map npj.decision.mode to effective action code
+    const decisionMode = npj.decision.mode
+    mostRestrictive = decisionMode === 'coach' && npj.decision.require_justification  ? 'coach-just'
+      : decisionMode === 'coach' && npj.decision.require_acknowledgement              ? 'coach-ack'
+      : decisionMode
+
+    exactMappings.push('npj.scope.activities → Netskope activities (exact, no inference)')
+    exactMappings.push('npj.decision.mode → Netskope action (exact, no inference)')
+
+    // Preserve evidence note
+    if (npj.decision.preserve_evidence) {
+      exactMappings.push('npj.decision.preserve_evidence → Save Evidence enabled')
+    }
+  } else {
+    // Legacy path: resolve from rules/primary_action
+    const postPromptAction = resolveAction(policy, 'post_prompt')
+    const uploadAction     = resolveAction(policy, 'upload')
+    const downloadAction   = resolveAction(policy, 'download')
+    const responseAction   = resolveAction(policy, 'response')
+
+    if (responseAction !== 'not-set') {
+      unsupportedIntent.push(
+        `response activity action "${responseAction}" cannot be mapped — Netskope Real-time Protection policies ` +
+        `do not intercept AI-generated responses. For AI output protection, use Netskope AI Access Security ` +
+        `(separate product capability) or a Download activity policy to inspect content returned from the AI app.`,
+      )
+    }
+
+    const actionMap: Record<string, string> = {}
+    if (postPromptAction !== 'not-set') { activities.push('Post');     actionMap['Post']     = postPromptAction }
+    if (uploadAction     !== 'not-set') { activities.push('Upload');   actionMap['Upload']   = uploadAction     }
+    if (downloadAction   !== 'not-set') { activities.push('Download'); actionMap['Download'] = downloadAction   }
+    if (activities.length === 0) activities.push('Upload', 'Post')
+
+    exactMappings.push('post_prompt → activity Post')
+    exactMappings.push('upload → activity Upload')
+    exactMappings.push('download → activity Download')
+
+    const actionsInUse = Object.values(actionMap).filter(a => a !== 'not-set')
+    mostRestrictive = actionsInUse.includes('block')             ? 'block'
+      : actionsInUse.some(a => a.startsWith('coach'))            ? 'coach'
+      : actionsInUse.includes('alert')                           ? 'alert'
+      : actionsInUse.includes('monitor')                         ? 'monitor'
+      : 'allow'
+  }
 
   // Destination = target + activities (matches Netskope UI layout)
   const destination = { ...destTarget, activities }
-
-  // Determine primary native action
-  const actionsInUse    = Object.values(actionMap).filter(a => a !== 'not-set')
-  const mostRestrictive = actionsInUse.includes('block')                   ? 'block'
-    : actionsInUse.some(a => a.startsWith('coach'))                        ? 'coach'
-    : actionsInUse.includes('alert')                                       ? 'alert'
-    : actionsInUse.includes('monitor')                                     ? 'monitor'
-    : 'allow'
 
   let primaryNativeAction = toNetskopeAction(mostRestrictive)
 
@@ -161,26 +193,77 @@ export function translate(
     lossyMappings.push('monitor mapped to Allow (Netskope has no Monitor action — policy will Allow traffic; add an alert profile if visibility is needed).')
   }
 
-  // DLP profiles — from classification label or inferred from rule data_types
-  const { profiles: dlpProfiles, source: profileSource } = inferDlpProfiles(policy)
+  // ── DLP profiles ──────────────────────────────────────────────────────────
+  let dlpProfiles: string[] = []
 
-  if (profileSource === 'label') {
-    exactMappings.push(`data_classification_label → DLP profile: ${dlpProfiles[0]} (must exist in Netskope tenant)`)
-    testsRequired.push(
-      `Create or verify DLP profile "${dlpProfiles[0]}" exists in Netskope (Policies → DLP Profiles) and matches the data patterns for "${policy.data_classification_label}".`,
-    )
-  } else if (profileSource === 'rules') {
-    for (const p of dlpProfiles) {
-      testsRequired.push(
-        `Create or verify DLP profile "${p}" exists in Netskope (Policies → DLP Profiles) covering the relevant data patterns from this policy's rules.`,
-      )
+  if (npj && npj.content.conditions.length > 0) {
+    // npj-first: build profiles from typed conditions
+    const dtSensitivities = new Set<string>()
+    let hasLabelCondition = false
+    let hasFilenameCondition = false
+
+    for (const cond of npj.content.conditions) {
+      if (cond.type === 'data_type') {
+        dtSensitivities.add(cond.sensitivity)
+      } else if (cond.type === 'classification_label') {
+        hasLabelCondition = true
+        // Classification labels map to a tenant-specific enterprise profile
+        dlpProfiles.push(`EFFATA-LABEL-${cond.label_id.toUpperCase().replace(/[^A-Z0-9]/g, '-')}`)
+        testsRequired.push(
+          `Configure enterprise classification profile in Netskope matching label "${cond.label_name}" ` +
+          `(source: ${cond.label_source}, key: ${cond.metadata_key}=${cond.metadata_value}).`,
+        )
+      } else if (cond.type === 'filename') {
+        hasFilenameCondition = true
+        unverifiedAreas.push('Filename pattern conditions — Netskope filename-based DLP detection is a separate product capability; verify tenant support.')
+      }
     }
-    lossyMappings.push(
-      `DLP profiles inferred from rule data_types (${dlpProfiles.join(', ')}) — no data_classification_label set. ` +
-      `Verify these profile names match your Netskope tenant configuration.`,
-    )
-  } else {
-    lossyMappings.push('No DLP profile configured — this policy acts on ALL content for the specified activities. Add a DLP profile in Netskope if content inspection is required.')
+
+    for (const sensitivity of dtSensitivities) {
+      dlpProfiles.push(dlpProfileName(sensitivity))
+    }
+
+    if (dtSensitivities.size > 0) {
+      for (const sensitivity of dtSensitivities) {
+        exactMappings.push(`npj.content.conditions[type=data_type, sensitivity=${sensitivity}] → DLP profile: ${dlpProfileName(sensitivity)}`)
+        testsRequired.push(`Create or verify DLP profile "${dlpProfileName(sensitivity)}" exists in Netskope (Policies → DLP Profiles).`)
+      }
+    }
+    if (hasLabelCondition) {
+      lossyMappings.push('Classification label conditions require tenant-specific enterprise-classification profile in Netskope — cannot be auto-created.')
+      unverifiedAreas.push('Public-doc parity for enterprise classification label conditions in Netskope.')
+    }
+    if (hasFilenameCondition) {
+      lossyMappings.push('Filename detection conditions — Netskope filename-based DLP is a separate capability; verify tenant support before enabling.')
+    }
+  } else if (!npj) {
+    // Legacy fallback
+    const { profiles: legacyProfiles, source: profileSource } = inferDlpProfiles(policy)
+    dlpProfiles = legacyProfiles
+
+    if (profileSource === 'label') {
+      exactMappings.push(`data_classification_label → DLP profile: ${dlpProfiles[0]} (must exist in Netskope tenant)`)
+      testsRequired.push(
+        `Create or verify DLP profile "${dlpProfiles[0]}" exists in Netskope (Policies → DLP Profiles) and matches the data patterns for "${policy.data_classification_label}".`,
+      )
+    } else if (profileSource === 'rules') {
+      for (const p of dlpProfiles) {
+        testsRequired.push(
+          `Create or verify DLP profile "${p}" exists in Netskope (Policies → DLP Profiles) covering the relevant data patterns from this policy's rules.`,
+        )
+      }
+      lossyMappings.push(
+        `DLP profiles inferred from rule data_types (${dlpProfiles.join(', ')}) — no data_classification_label set. ` +
+        `Verify these profile names match your Netskope tenant configuration.`,
+      )
+    } else {
+      lossyMappings.push('No DLP profile configured — this policy acts on ALL content for the specified activities. Add a DLP profile in Netskope if content inspection is required.')
+    }
+
+    if (policy.rules.some(r => r.data_type.startsWith('clabel:'))) {
+      lossyMappings.push('Sensitivity label conditions (clabel:) require tenant-specific enterprise-classification profile in Netskope — cannot be auto-created.')
+      unverifiedAreas.push('Public-doc parity for generic label-condition syntax in Netskope.')
+    }
   }
 
   // Notification template for coach
@@ -196,76 +279,78 @@ export function translate(
 
   exactMappings.push('primary_action → profile action')
 
-  if (policy.policy_type === 'prohibited') {
+  // Prohibited intent / govern_app_access always maps to Block
+  const isProhibited = npj
+    ? npj.intent === 'govern_app_access'
+    : policy.policy_type === 'prohibited'
+  if (isProhibited) {
     primaryNativeAction = 'Block'
-    exactMappings.push('policy_type prohibited → action Block')
+    exactMappings.push(npj ? 'npj.intent govern_app_access → action Block' : 'policy_type prohibited → action Block')
   }
 
-  // Profile & Action — Netskope simple form: one action for all DLP profiles.
-  // The per-profile table ("Set action for each profile") is only needed when different
-  // profiles require different actions — not the case here.
+  // Profile & Action
   const profileAction = dlpProfiles.length > 0
     ? { dlp_profiles: dlpProfiles, action: primaryNativeAction, notification_template: notificationTemplate }
     : null
 
-  // Traffic Action ("+ ADD TRAFFIC ACTION" in Netskope) is NOT a default.
-  // It only applies when there is a specific requirement to take action on traffic
-  // that doesn't match any configured DLP profile.
-  // Customers should decide whether to add this in the Netskope console based on their
-  // visibility requirements. See tests_required below.
   testsRequired.push(
     'Optionally configure a Traffic Action in Netskope (+ ADD TRAFFIC ACTION) if you want to Alert or Block ' +
     'on traffic that does not match any of the configured DLP profiles. Leave unset if downstream policies cover this.',
   )
 
-  // For approved-use: emit a tightly-scoped Allow policy first (top-down first-match).
-  // No traffic action on Allow policies — the Allow itself is the intended action.
-  if (policy.policy_type === 'approved-use' || policy.primary_action === 'allow') {
-    const allowActivities: string[] = []
-    if (uploadAction === 'allow')     allowActivities.push('Upload')
-    if (postPromptAction === 'allow') allowActivities.push('Post')
-    if (downloadAction === 'allow')   allowActivities.push('Download')
-    if (allowActivities.length === 0) allowActivities.push('Upload', 'Post')
+  // ── Approved-use / exceptions → Allow policy ──────────────────────────────
+  const shouldEmitAllow = npj
+    ? npj.intent === 'allow_approved_use' || npj.exceptions.some(e => e.effect === 'allow')
+    : (policy.policy_type === 'approved-use' || policy.primary_action === 'allow')
+
+  if (shouldEmitAllow) {
+    const allowActivities = npj
+      ? activities   // already correctly set from npj.scope.activities
+      : (() => {
+          const arr: string[] = []
+          const ua = resolveAction(policy, 'upload')
+          const pa = resolveAction(policy, 'post_prompt')
+          const da = resolveAction(policy, 'download')
+          if (ua === 'allow') arr.push('Upload')
+          if (pa === 'allow') arr.push('Post')
+          if (da === 'allow') arr.push('Download')
+          return arr.length === 0 ? ['Upload', 'Post'] : arr
+        })()
 
     nativePolicies.push({
-      name:          `[Allow] ${policy.name}`,
-      description:   generateDescription('Allow', allowActivities, null, destTarget),
-      status:        'enabled',
+      name:           `[Allow] ${policy.name}`,
+      description:    generateDescription('Allow', allowActivities, null, destTarget),
+      status:         'enabled',
       source,
-      destination:   { ...destTarget, activities: allowActivities },
+      destination:    { ...destTarget, activities: allowActivities },
       profile_action: null,
-      action:        'Allow',
-      group:         '1. Header Policies',
-      policy_type:   'Cloud App Access',
-      policy_family: 'Real-time Protection',
+      action:         'Allow',
+      group:          '1. Header Policies',
+      policy_type:    'Cloud App Access',
+      policy_family:  'Real-time Protection',
     })
-    exactMappings.push('approved-use → Allow action')
+    exactMappings.push(npj ? 'npj.intent allow_approved_use → Allow action' : 'approved-use → Allow action')
     testsRequired.push(
       'Validate Allow rule is scoped to an approved app instance + approved user group to avoid bypassing downstream DLP controls.',
       'Verify policy order in Netskope console — this Allow rule must sit above block/DLP rules for the same destination.',
     )
   }
 
-  if (policy.rules.some(r => r.data_type.startsWith('clabel:'))) {
-    lossyMappings.push('Sensitivity label conditions (clabel:) require tenant-specific enterprise-classification profile in Netskope — cannot be auto-created.')
-    unverifiedAreas.push('Public-doc parity for generic label-condition syntax in Netskope.')
-  }
-
-  // Use first inferred label or the original classification label for description
-  const descLabel = policy.data_classification_label ?? (dlpProfiles.length > 0 ? dlpProfiles[0].replace('EFFATA-', '').toLowerCase() : null)
+  const descLabel = npj
+    ? (npj.content.conditions.find(c => c.type === 'data_type') as { sensitivity?: string } | undefined)?.sensitivity ?? null
+    : policy.data_classification_label ?? (dlpProfiles.length > 0 ? dlpProfiles[0].replace('EFFATA-', '').toLowerCase() : null)
 
   nativePolicies.push({
-    name:          `[DLP] ${policy.name}`,
-    description:   generateDescription(primaryNativeAction, activities, descLabel, destTarget),
-    status:        'enabled',
+    name:           `[DLP] ${policy.name}`,
+    description:    generateDescription(primaryNativeAction, activities, descLabel, destTarget),
+    status:         'enabled',
     source,
     destination,
     profile_action: profileAction,
-    // action is always present so the UI can show what the policy does even without a DLP profile
-    action:        primaryNativeAction,
-    group:         policyGroup(primaryNativeAction),
-    policy_type:   'Cloud App Access',
-    policy_family: 'Real-time Protection',
+    action:         primaryNativeAction,
+    group:          policyGroup(primaryNativeAction),
+    policy_type:    'Cloud App Access',
+    policy_family:  'Real-time Protection',
   })
 
   testsRequired.push(

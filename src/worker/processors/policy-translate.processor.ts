@@ -24,12 +24,12 @@ export async function policyTranslateProcessor(
     (policyIds
       ? serviceClient
           .from('org_genai_policies')
-          .select('id, name, description, policy_type, policy_family, primary_action, data_classification_label, scope_all_apps, scope_app_ids, rules')
+          .select('id, name, description, policy_type, policy_family, primary_action, data_classification_label, scope_all_apps, scope_app_ids, rules, neutral_policy_json')
           .eq('org_id', orgId)
           .in('id', policyIds)
       : serviceClient
           .from('org_genai_policies')
-          .select('id, name, description, policy_type, policy_family, primary_action, data_classification_label, scope_all_apps, scope_app_ids, rules')
+          .select('id, name, description, policy_type, policy_family, primary_action, data_classification_label, scope_all_apps, scope_app_ids, rules, neutral_policy_json')
           .eq('org_id', orgId)
           .eq('is_active', true)
     ),

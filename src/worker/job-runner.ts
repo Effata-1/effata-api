@@ -7,6 +7,7 @@ import { coverageReviewProcessor } from './processors/coverage-review.processor'
 import { evidenceReportProcessor } from './processors/evidence-report.processor'
 import { policyPackProcessor } from './processors/policy-pack.processor'
 import { policyTranslateProcessor } from './processors/policy-translate.processor'
+import { policyCompileProcessor } from './processors/policy-compile.processor'
 
 const WORKER_ID = `worker-${crypto.randomUUID().slice(0, 8)}`
 
@@ -18,6 +19,7 @@ const PROCESSORS: Record<string, Processor> = {
   'evidence-report':  evidenceReportProcessor,
   'policy-pack':      policyPackProcessor,
   'policy-translate': policyTranslateProcessor,
+  'policy-compile':   policyCompileProcessor,
 }
 
 interface ClaimedJob {

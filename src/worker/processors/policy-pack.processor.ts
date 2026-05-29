@@ -1,6 +1,7 @@
 import { serviceClient } from '../../lib/supabase'
 import { logAiRun } from '../../lib/ai-log'
 import { generatePolicyPack, type PolicyPackRecommendation } from '../../ai/agents/policy-pack'
+import { buildNeutralPolicyFromPackOutput } from '../../neutral-policies/pack-builder'
 import type { ProcessorContext } from '../job-config'
 
 interface RejectedPolicy {
@@ -163,8 +164,52 @@ export async function policyPackProcessor(ctx: ProcessorContext): Promise<Record
     updated_at:                 now,
   }))
 
-  const { error: insertError } = await serviceClient.from('org_genai_policies').insert(rows)
+  const { data: insertedRows, error: insertError } = await serviceClient
+    .from('org_genai_policies')
+    .insert(rows)
+    .select('id, name, description, policy_type, policy_family, primary_action, data_classification_label, scope_all_apps, scope_app_ids')
   if (insertError) throw new Error(`Failed to insert policies: ${insertError.message}`)
+
+  // Fetch in-scope data types for the org (needed by pack-builder to build content conditions)
+  const { data: inScopeDataTypes } = await serviceClient
+    .from('org_data_types')
+    .select('slug, name, system_level')
+    .eq('org_id', orgId)
+    .eq('is_in_scope', true)
+
+  const context = { inScopeDataTypes: inScopeDataTypes ?? [] }
+
+  // Build and persist neutral_policy_json for each inserted policy
+  if (insertedRows && insertedRows.length > 0) {
+    const neutralUpdates = insertedRows.map(row => {
+      const aiPolicy = {
+        id:                        row.id as string,
+        name:                      row.name as string,
+        description:               row.description as string,
+        policy_type:               row.policy_type as 'usage' | 'data-handling' | 'approved-use' | 'prohibited',
+        policy_family:             (row.policy_family ?? 'GenAI Content Detection') as string,
+        primary_action:            (row.primary_action ?? 'monitor') as string,
+        data_classification_label: (row.data_classification_label ?? 'all') as string,
+        scope_all_apps:            row.scope_all_apps as boolean,
+        scope_app_ids:             (row.scope_app_ids ?? []) as string[],
+      }
+      const { neutralPolicy, hash } = buildNeutralPolicyFromPackOutput(aiPolicy, context)
+      return { id: row.id as string, neutralPolicy, hash }
+    })
+
+    for (const { id, neutralPolicy, hash } of neutralUpdates) {
+      await serviceClient
+        .from('org_genai_policies')
+        .update({
+          neutral_policy_json:    neutralPolicy,
+          neutral_policy_version: '1.0',
+          neutral_policy_hash:    hash,
+          policy_key:             neutralPolicy.policy_key,
+        })
+        .eq('id', id)
+        .eq('org_id', orgId)
+    }
+  }
 
   void logAiRun({
     orgId,

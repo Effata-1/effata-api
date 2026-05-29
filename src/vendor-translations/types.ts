@@ -24,6 +24,10 @@ export interface PolicyRule {
   response:    string
 }
 
+import type { NeutralPolicyV1 } from '../neutral-policies/types'
+
+export type { NeutralPolicyV1 }
+
 export interface NeutralPolicy {
   id:                        string
   name:                      string
@@ -35,6 +39,9 @@ export interface NeutralPolicy {
   scope_all_apps:            boolean
   scope_app_ids:             string[]
   rules:                     PolicyRule[]
+  // Structured neutral policy JSON — populated by the compiler. Adapters should
+  // use this as primary source; fall back to legacy fields only when null/invalid.
+  neutral_policy_json?:      NeutralPolicyV1 | null
 }
 
 export interface VendorCapabilityRegistry {

@@ -1,5 +1,6 @@
 import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction } from '../types'
+import { validateNeutralPolicy } from '../../neutral-policies/schema'
 
 export const ADAPTER_VERSION = '1.0.0'
 
@@ -16,9 +17,28 @@ export function translate(
 
   const nativePolicies: object[] = []
 
-  const postPromptAction = resolveAction(policy, 'post_prompt')
-  const uploadAction     = resolveAction(policy, 'upload')
-  const downloadAction   = resolveAction(policy, 'download')
+  // npj-first: use structured neutral policy when valid
+  const npj = policy.neutral_policy_json
+    ? validateNeutralPolicy(policy.neutral_policy_json)
+    : null
+  if (policy.neutral_policy_json && Object.keys(policy.neutral_policy_json).length > 0 && !npj) {
+    lossyMappings.push('neutral_policy_json failed schema validation — translated from legacy fields only. Re-generate policies for better accuracy.')
+  }
+
+  const postPromptAction = npj
+    ? (npj.scope.activities.includes('post') || npj.scope.activities.includes('prompt_submit') ? npj.decision.mode : 'not-set')
+    : resolveAction(policy, 'post_prompt')
+  const uploadAction = npj
+    ? (npj.scope.activities.includes('upload') ? npj.decision.mode : 'not-set')
+    : resolveAction(policy, 'upload')
+  const downloadAction = npj
+    ? (npj.scope.activities.includes('download') ? npj.decision.mode : 'not-set')
+    : resolveAction(policy, 'download')
+
+  if (npj) {
+    exactMappings.push('npj.scope.activities → Purview location activities (exact)')
+    exactMappings.push('npj.decision.mode → Purview action (exact)')
+  }
 
   const purviewAction = (action: string): string => {
     switch (action) {
@@ -36,15 +56,30 @@ export function translate(
   const userScope = policy.scope_all_apps ? 'All Users' : 'Scoped Users'
 
   const contentConditions: string[] = []
-  if (policy.data_classification_label && policy.data_classification_label !== 'all') {
-    contentConditions.push(`Sensitivity label: ${policy.data_classification_label}`)
-    exactMappings.push('data_classification_label → sensitivity label condition (where location supports it)')
-  }
-  for (const rule of policy.rules) {
-    if (rule.data_type.startsWith('clabel:')) {
-      contentConditions.push('Customer sensitivity label (clabel:) — requires EDM or AIP label mapping')
-    } else if (!contentConditions.includes(rule.data_type)) {
-      contentConditions.push(rule.data_type)
+  if (npj && npj.content.conditions.length > 0) {
+    for (const cond of npj.content.conditions) {
+      if (cond.type === 'data_type') {
+        contentConditions.push(`Sensitivity: ${cond.sensitivity} (${cond.name})`)
+        exactMappings.push(`npj data_type condition [${cond.sensitivity}] → SIT or sensitivity label condition`)
+      } else if (cond.type === 'classification_label') {
+        contentConditions.push(`Classification label: ${cond.label_name} (${cond.label_source})`)
+        exactMappings.push('npj classification_label condition → AIP/sensitivity label condition')
+      } else if (cond.type === 'filename') {
+        contentConditions.push(`Filename pattern: ${cond.pattern}`)
+        lossyMappings.push('Filename pattern conditions — Purview does not natively support glob-based filename matching; use SIT or keyword rules instead.')
+      }
+    }
+  } else {
+    if (policy.data_classification_label && policy.data_classification_label !== 'all') {
+      contentConditions.push(`Sensitivity label: ${policy.data_classification_label}`)
+      exactMappings.push('data_classification_label → sensitivity label condition (where location supports it)')
+    }
+    for (const rule of policy.rules) {
+      if (rule.data_type.startsWith('clabel:')) {
+        contentConditions.push('Customer sensitivity label (clabel:) — requires EDM or AIP label mapping')
+      } else if (!contentConditions.includes(rule.data_type)) {
+        contentConditions.push(rule.data_type)
+      }
     }
   }
   if (contentConditions.length === 0) contentConditions.push('All content')
@@ -110,7 +145,7 @@ export function translate(
   }
 
   // Allow policies need scoping warning
-  if (policy.policy_type === 'approved-use' || policy.primary_action === 'allow') {
+  if ((npj ? npj.intent === 'allow_approved_use' : false) || policy.policy_type === 'approved-use' || policy.primary_action === 'allow') {
     unverifiedAreas.push(
       'Allow policy: validate scope includes approved app instance, approved user group, and approved tenant. Policy bundle order must be reviewed in Purview compliance portal.',
     )
