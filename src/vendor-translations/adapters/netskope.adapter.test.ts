@@ -4,7 +4,7 @@ import { translate } from './netskope.adapter'
 import { FIXTURES, MOCK_REGISTRY } from './test-fixtures'
 
 describe('netskope adapter', () => {
-  test('secret upload block — main policy has profile_action with Block and Upload activity', () => {
+  test('secret upload block — main policy has simple profile_action with Block and Upload activity', () => {
     const result = translate(FIXTURES.secretUploadBlock, MOCK_REGISTRY)
     assert.equal(result.vendor, 'netskope')
     assert.ok(['success', 'partial'].includes(result.status))
@@ -16,11 +16,15 @@ describe('netskope adapter', () => {
     const dest = mainPolicy.destination as Record<string, unknown>
     assert.ok((dest.activities as string[]).includes('Upload'), 'Upload activity missing from destination')
 
-    // Profile & Action table
-    const profileAction = mainPolicy.profile_action as Array<Record<string, unknown>>
-    assert.ok(Array.isArray(profileAction), 'profile_action must be an array')
-    assert.equal(profileAction[0].action, 'Block')
-    assert.ok(typeof mainPolicy.fallback_action === 'string', 'fallback_action missing')
+    // Profile & Action — simple object (one action for all profiles), no per-profile table
+    const profileAction = mainPolicy.profile_action as Record<string, unknown> | null
+    assert.ok(profileAction !== null, 'profile_action must be set when label is present')
+    assert.ok(Array.isArray(profileAction!.dlp_profiles), 'dlp_profiles must be an array')
+    assert.equal(profileAction!.action, 'Block')
+
+    // No traffic_action by default — it is not mandatory
+    assert.ok(!('traffic_action' in mainPolicy), 'traffic_action must not be emitted by default')
+
     assert.ok(result.mapping_report.exact_mappings.length > 0)
   })
 
@@ -28,16 +32,20 @@ describe('netskope adapter', () => {
     const result = translate(FIXTURES.confidentialCoach, MOCK_REGISTRY)
     const mainPolicy = result.native_policies.find((p: unknown) => (p as Record<string, string>).name?.startsWith('[DLP]')) as Record<string, unknown>
     assert.ok(mainPolicy, 'main [DLP] policy missing')
-    const profileAction = mainPolicy.profile_action as Array<Record<string, unknown>>
-    assert.equal(profileAction[0].action, 'Coach')
-    assert.ok(typeof profileAction[0].notification_template === 'string', 'notification_template missing for coach')
+    const profileAction = mainPolicy.profile_action as Record<string, unknown> | null
+    assert.ok(profileAction, 'profile_action missing')
+    assert.equal(profileAction!.action, 'Coach')
+    assert.ok(typeof profileAction!.notification_template === 'string', 'notification_template missing for coach')
   })
 
   test('approved use allow — scoped Allow rule emitted first, tests_required contains scope warning', () => {
     const result = translate(FIXTURES.approvedUseAllow, MOCK_REGISTRY)
     const allowPolicy = result.native_policies.find((p: unknown) => (p as Record<string, string>).name?.startsWith('[Allow]')) as Record<string, unknown>
     assert.ok(allowPolicy, '[Allow] policy missing')
-    assert.equal(allowPolicy.fallback_action, 'Allow')
+    assert.equal(allowPolicy.action, 'Allow')
+    // Allow policy has no profile_action and no traffic_action
+    assert.equal(allowPolicy.profile_action, null)
+    assert.ok(!('traffic_action' in allowPolicy), 'Allow policy must not have traffic_action')
     assert.ok(
       result.mapping_report.tests_required.some(t => t.toLowerCase().includes('allow')),
       'No allow scope warning in tests_required',
@@ -76,16 +84,26 @@ describe('netskope adapter', () => {
     assert.deepEqual(dest.specific_apps, ['chatgpt', 'claude', 'gemini'])
   })
 
-  test('all policies have source, status, group, destination.activities, profile_action, fallback_action', () => {
+  test('all policies have source, status, group, destination.activities, profile_action', () => {
     const result = translate(FIXTURES.secretUploadBlock, MOCK_REGISTRY)
     const mainPolicy = result.native_policies.find((p: unknown) => (p as Record<string, string>).name?.startsWith('[DLP]')) as Record<string, unknown>
     assert.ok(mainPolicy.source, 'source missing')
     assert.equal(mainPolicy.status, 'enabled')
     assert.ok(typeof mainPolicy.group === 'string', 'group missing')
-    assert.ok(Array.isArray(mainPolicy.profile_action), 'profile_action must be an array')
-    assert.ok(typeof mainPolicy.fallback_action === 'string', 'fallback_action missing')
+    // profile_action is an object (not array) or null
+    assert.ok('profile_action' in mainPolicy, 'profile_action key must be present')
     const dest = mainPolicy.destination as Record<string, unknown>
     assert.ok(Array.isArray(dest.activities), 'destination.activities missing')
+  })
+
+  test('no traffic_action emitted by default — it is not mandatory', () => {
+    for (const fixture of Object.values(FIXTURES)) {
+      const result = translate(fixture, MOCK_REGISTRY)
+      for (const p of result.native_policies) {
+        const policy = p as Record<string, unknown>
+        assert.ok(!('traffic_action' in policy), `traffic_action must not be emitted by default (fixture policy: ${policy.name})`)
+      }
+    }
   })
 
   test('mapping_report fields are always present', () => {

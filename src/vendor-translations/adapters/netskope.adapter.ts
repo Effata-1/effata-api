@@ -1,7 +1,7 @@
 import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction } from '../types'
 
-export const ADAPTER_VERSION = '2.0.0'
+export const ADAPTER_VERSION = '3.0.0'
 
 function toNetskopeAction(effataAction: string): string {
   switch (effataAction) {
@@ -10,7 +10,7 @@ function toNetskopeAction(effataAction: string): string {
     case 'coach-ack':
     case 'coach-just':             return 'Coach'
     case 'alert':                  return 'Alert'
-    case 'monitor':                return 'Allow'  // Netskope has no Monitor — Allow is the equivalent
+    case 'monitor':                return 'Allow'  // Netskope has no Monitor — Allow is the closest equivalent
     case 'allow':                  return 'Allow'
     default:                       return 'Allow'
   }
@@ -45,8 +45,7 @@ export function translate(
   const responseAction   = resolveAction(policy, 'response')
 
   // Netskope RT policies do not have a "Response" activity — only Post/Upload/Download.
-  // AI output protection (response interception) requires a different approach
-  // (Netskope AI Access Security or a separate download DLP policy for content returning from AI).
+  // AI output protection requires Netskope AI Access Security or a separate Download DLP policy.
   if (responseAction !== 'not-set') {
     unsupportedIntent.push(
       `response activity action "${responseAction}" cannot be mapped — Netskope Real-time Protection policies ` +
@@ -98,7 +97,7 @@ export function translate(
     : actionsInUse.includes('monitor')                                     ? 'monitor'
     : 'allow'
 
-  const primaryNativeAction = toNetskopeAction(mostRestrictive)
+  let primaryNativeAction = toNetskopeAction(mostRestrictive)
 
   if (mostRestrictive === 'monitor') {
     lossyMappings.push('monitor mapped to Allow (Netskope has no Monitor action — policy will Allow traffic; add an alert profile if visibility is needed).')
@@ -126,25 +125,32 @@ export function translate(
     )
   }
 
-  // Profile & Action (per-profile action table + fallback)
-  // Matches the "Profile & Action" section in Netskope UI
-  const profileAction = profileName
-    ? [{ dlp_profile: profileName, action: primaryNativeAction, notification_template: notificationTemplate }]
-    : []
-
-  // Fallback = what happens when no DLP profile matches
-  const fallbackAction = primaryNativeAction === 'Block' ? 'Alert'
-    : primaryNativeAction === 'Coach'                   ? 'Alert'
-    : primaryNativeAction
-
   exactMappings.push('primary_action → profile action')
 
   if (policy.policy_type === 'prohibited') {
-    if (profileAction.length > 0) profileAction[0].action = 'Block'
+    primaryNativeAction = 'Block'
     exactMappings.push('policy_type prohibited → action Block')
   }
 
-  // For approved-use: emit a tightly-scoped Allow policy first (top-down first-match)
+  // Profile & Action — Netskope simple form: one action for all DLP profiles.
+  // The per-profile table ("Set action for each profile") is only needed when different
+  // profiles require different actions — not the case here.
+  const profileAction = profileName
+    ? { dlp_profiles: [profileName], action: primaryNativeAction, notification_template: notificationTemplate }
+    : null
+
+  // Traffic Action ("+ ADD TRAFFIC ACTION" in Netskope) is NOT a default.
+  // It only applies when there is a specific requirement to take action on traffic
+  // that doesn't match any configured DLP profile.
+  // Customers should decide whether to add this in the Netskope console based on their
+  // visibility requirements. See tests_required below.
+  testsRequired.push(
+    'Optionally configure a Traffic Action in Netskope (+ ADD TRAFFIC ACTION) if you want to Alert or Block ' +
+    'on traffic that does not match any of the configured DLP profiles. Leave unset if downstream policies cover this.',
+  )
+
+  // For approved-use: emit a tightly-scoped Allow policy first (top-down first-match).
+  // No traffic action on Allow policies — the Allow itself is the intended action.
   if (policy.policy_type === 'approved-use' || policy.primary_action === 'allow') {
     const allowActivities: string[] = []
     if (uploadAction === 'allow')     allowActivities.push('Upload')
@@ -153,15 +159,15 @@ export function translate(
     if (allowActivities.length === 0) allowActivities.push('Upload', 'Post')
 
     nativePolicies.push({
-      name:            `[Allow] ${policy.name}`,
-      status:          'enabled',
+      name:          `[Allow] ${policy.name}`,
+      status:        'enabled',
       source,
-      destination:     { ...destTarget, activities: allowActivities },
-      profile_action:  [],
-      fallback_action: 'Allow',
-      group:           '1. Header Policies',
-      policy_type:     'Cloud App Access',
-      policy_family:   'Real-time Protection',
+      destination:   { ...destTarget, activities: allowActivities },
+      profile_action: null,
+      action:        'Allow',
+      group:         '1. Header Policies',
+      policy_type:   'Cloud App Access',
+      policy_family: 'Real-time Protection',
     })
     exactMappings.push('approved-use → Allow action')
     testsRequired.push(
@@ -176,15 +182,14 @@ export function translate(
   }
 
   nativePolicies.push({
-    name:            `[DLP] ${policy.name}`,
-    status:          'enabled',
+    name:          `[DLP] ${policy.name}`,
+    status:        'enabled',
     source,
     destination,
-    profile_action:  profileAction,
-    fallback_action: fallbackAction,
-    group:           policyGroup(primaryNativeAction),
-    policy_type:     'Cloud App Access',
-    policy_family:   'Real-time Protection',
+    profile_action: profileAction,
+    group:         policyGroup(primaryNativeAction),
+    policy_type:   'Cloud App Access',
+    policy_family: 'Real-time Protection',
   })
 
   testsRequired.push(
