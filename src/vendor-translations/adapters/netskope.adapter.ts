@@ -27,6 +27,32 @@ function dlpProfileName(label: string | null): string | null {
   return `EFFATA-${label.toUpperCase().replace(/-/g, '_')}`
 }
 
+function generateDescription(
+  action: string,
+  activities: string[],
+  label: string | null,
+  dest: Record<string, string | string[]>,
+): string {
+  const actStr = activities.length === 0 ? 'traffic'
+    : activities.length === 1 ? activities[0].toLowerCase()
+    : activities.slice(0, -1).map(a => a.toLowerCase()).join(', ') + ' and ' + activities[activities.length - 1].toLowerCase()
+
+  const dataStr = label ? `${label} data` : 'all content'
+
+  const specificApps = dest.specific_apps as string[] | undefined
+  const destStr = specificApps && specificApps.length > 0
+    ? specificApps.slice(0, 3).join(', ') + (specificApps.length > 3 ? ` +${specificApps.length - 3} more` : '')
+    : 'all GenAI apps'
+
+  switch (action) {
+    case 'Block':  return `Block ${actStr} of ${dataStr} to ${destStr}.`
+    case 'Coach':  return `Coach users before ${actStr} of ${dataStr} to ${destStr}.`
+    case 'Alert':  return `Alert on ${actStr} of ${dataStr} to ${destStr}.`
+    case 'Allow':  return `Permit access to ${destStr}. Scope to approved app instances and user groups before enabling.`
+    default:       return `Apply ${action.toLowerCase()} on ${actStr} of ${dataStr} to ${destStr}.`
+  }
+}
+
 export function translate(
   policy: NeutralPolicy,
   _registry: VendorCapabilityRegistry,
@@ -160,6 +186,7 @@ export function translate(
 
     nativePolicies.push({
       name:          `[Allow] ${policy.name}`,
+      description:   generateDescription('Allow', allowActivities, null, destTarget),
       status:        'enabled',
       source,
       destination:   { ...destTarget, activities: allowActivities },
@@ -183,6 +210,7 @@ export function translate(
 
   nativePolicies.push({
     name:          `[DLP] ${policy.name}`,
+    description:   generateDescription(primaryNativeAction, activities, policy.data_classification_label, destTarget),
     status:        'enabled',
     source,
     destination,
