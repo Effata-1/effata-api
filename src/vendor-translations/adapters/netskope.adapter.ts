@@ -22,9 +22,41 @@ function policyGroup(action: string): string {
   return '3. Monitoring Policies'
 }
 
-function dlpProfileName(label: string | null): string | null {
-  if (!label || label === 'all') return null
+function dlpProfileName(label: string): string {
   return `EFFATA-${label.toUpperCase().replace(/-/g, '_')}`
+}
+
+/**
+ * Derive DLP profile names for a policy.
+ * Priority: data_classification_label → rule data_type prefixes → none.
+ * Returns { profiles, fromRules } so the caller can add appropriate mapping notes.
+ */
+function inferDlpProfiles(
+  policy: NeutralPolicy,
+): { profiles: string[]; source: 'label' | 'rules' | 'none' } {
+  // Priority 1: explicit classification label
+  if (policy.data_classification_label && policy.data_classification_label !== 'all') {
+    return { profiles: [dlpProfileName(policy.data_classification_label)], source: 'label' }
+  }
+
+  // Priority 2: infer from rule data_type prefixes (e.g. "secret:api-key" → EFFATA-SECRET)
+  const prefixes = new Set<string>()
+  for (const rule of policy.rules) {
+    const dt = rule.data_type
+    if (!dt || dt === 'all') continue
+    if (dt.startsWith('clabel:')) continue  // label conditions — separate handling
+    const prefix = dt.includes(':') ? dt.split(':')[0] : dt
+    if (prefix) prefixes.add(prefix)
+  }
+
+  if (prefixes.size > 0) {
+    return {
+      profiles: [...prefixes].map(p => dlpProfileName(p)),
+      source: 'rules',
+    }
+  }
+
+  return { profiles: [], source: 'none' }
 }
 
 function generateDescription(
@@ -129,15 +161,26 @@ export function translate(
     lossyMappings.push('monitor mapped to Allow (Netskope has no Monitor action — policy will Allow traffic; add an alert profile if visibility is needed).')
   }
 
-  // DLP profile
-  const profileName = dlpProfileName(policy.data_classification_label)
-  if (profileName) {
-    exactMappings.push(`data_classification_label → DLP profile: ${profileName} (must exist in Netskope tenant)`)
+  // DLP profiles — from classification label or inferred from rule data_types
+  const { profiles: dlpProfiles, source: profileSource } = inferDlpProfiles(policy)
+
+  if (profileSource === 'label') {
+    exactMappings.push(`data_classification_label → DLP profile: ${dlpProfiles[0]} (must exist in Netskope tenant)`)
     testsRequired.push(
-      `Create or verify DLP profile "${profileName}" exists in Netskope (Policies → DLP Profiles) and matches the data patterns for "${policy.data_classification_label}".`,
+      `Create or verify DLP profile "${dlpProfiles[0]}" exists in Netskope (Policies → DLP Profiles) and matches the data patterns for "${policy.data_classification_label}".`,
+    )
+  } else if (profileSource === 'rules') {
+    for (const p of dlpProfiles) {
+      testsRequired.push(
+        `Create or verify DLP profile "${p}" exists in Netskope (Policies → DLP Profiles) covering the relevant data patterns from this policy's rules.`,
+      )
+    }
+    lossyMappings.push(
+      `DLP profiles inferred from rule data_types (${dlpProfiles.join(', ')}) — no data_classification_label set. ` +
+      `Verify these profile names match your Netskope tenant configuration.`,
     )
   } else {
-    lossyMappings.push('No data_classification_label — no DLP profile configured. This policy acts on ALL content for the specified activities. Add a DLP profile if content inspection is required.')
+    lossyMappings.push('No DLP profile configured — this policy acts on ALL content for the specified activities. Add a DLP profile in Netskope if content inspection is required.')
   }
 
   // Notification template for coach
@@ -161,8 +204,8 @@ export function translate(
   // Profile & Action — Netskope simple form: one action for all DLP profiles.
   // The per-profile table ("Set action for each profile") is only needed when different
   // profiles require different actions — not the case here.
-  const profileAction = profileName
-    ? { dlp_profiles: [profileName], action: primaryNativeAction, notification_template: notificationTemplate }
+  const profileAction = dlpProfiles.length > 0
+    ? { dlp_profiles: dlpProfiles, action: primaryNativeAction, notification_template: notificationTemplate }
     : null
 
   // Traffic Action ("+ ADD TRAFFIC ACTION" in Netskope) is NOT a default.
@@ -208,13 +251,18 @@ export function translate(
     unverifiedAreas.push('Public-doc parity for generic label-condition syntax in Netskope.')
   }
 
+  // Use first inferred label or the original classification label for description
+  const descLabel = policy.data_classification_label ?? (dlpProfiles.length > 0 ? dlpProfiles[0].replace('EFFATA-', '').toLowerCase() : null)
+
   nativePolicies.push({
     name:          `[DLP] ${policy.name}`,
-    description:   generateDescription(primaryNativeAction, activities, policy.data_classification_label, destTarget),
+    description:   generateDescription(primaryNativeAction, activities, descLabel, destTarget),
     status:        'enabled',
     source,
     destination,
     profile_action: profileAction,
+    // action is always present so the UI can show what the policy does even without a DLP profile
+    action:        primaryNativeAction,
     group:         policyGroup(primaryNativeAction),
     policy_type:   'Cloud App Access',
     policy_family: 'Real-time Protection',

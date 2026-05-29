@@ -84,16 +84,39 @@ describe('netskope adapter', () => {
     assert.deepEqual(dest.specific_apps, ['chatgpt', 'claude', 'gemini'])
   })
 
-  test('all policies have source, status, group, destination.activities, profile_action', () => {
+  test('all DLP policies have source, status, group, destination.activities, profile_action, action', () => {
     const result = translate(FIXTURES.secretUploadBlock, MOCK_REGISTRY)
     const mainPolicy = result.native_policies.find((p: unknown) => (p as Record<string, string>).name?.startsWith('[DLP]')) as Record<string, unknown>
     assert.ok(mainPolicy.source, 'source missing')
     assert.equal(mainPolicy.status, 'enabled')
     assert.ok(typeof mainPolicy.group === 'string', 'group missing')
-    // profile_action is an object (not array) or null
     assert.ok('profile_action' in mainPolicy, 'profile_action key must be present')
+    // action must always be present even when profile_action is null
+    assert.ok(typeof mainPolicy.action === 'string', 'action must always be present on DLP policy')
     const dest = mainPolicy.destination as Record<string, unknown>
     assert.ok(Array.isArray(dest.activities), 'destination.activities missing')
+  })
+
+  test('rules data_type prefixes infer DLP profile names when no data_classification_label', () => {
+    // Build a fixture with no label but rules with typed data_types
+    const noLabelPolicy = {
+      ...FIXTURES.secretUploadBlock,
+      id: 'p-nolabel',
+      data_classification_label: null,
+      rules: [
+        { data_type: 'secret:api-key', post_prompt: 'block', upload: 'block', download: 'not-set', response: 'not-set' },
+        { data_type: 'secret:aws-key', post_prompt: 'block', upload: 'block', download: 'not-set', response: 'not-set' },
+      ],
+    }
+    const result = translate(noLabelPolicy, MOCK_REGISTRY)
+    const mainPolicy = result.native_policies.find((p: unknown) => (p as Record<string, string>).name?.startsWith('[DLP]')) as Record<string, unknown>
+    const profileAction = mainPolicy.profile_action as Record<string, unknown> | null
+    // "secret:api-key" and "secret:aws-key" both prefix to "secret" → EFFATA-SECRET (deduplicated)
+    assert.ok(profileAction !== null, 'profile_action must be set when rules have typed data_types')
+    assert.deepEqual((profileAction!.dlp_profiles as string[]), ['EFFATA-SECRET'])
+    assert.ok(result.mapping_report.lossy_mappings.some(m => m.includes('inferred from rule data_types')))
+    // action must still be present
+    assert.equal(mainPolicy.action, 'Block')
   })
 
   test('no traffic_action emitted by default — it is not mandatory', () => {
