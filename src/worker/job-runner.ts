@@ -6,16 +6,18 @@ import { genaiRefreshProcessor } from './processors/genai-refresh.processor'
 import { coverageReviewProcessor } from './processors/coverage-review.processor'
 import { evidenceReportProcessor } from './processors/evidence-report.processor'
 import { policyPackProcessor } from './processors/policy-pack.processor'
+import { policyTranslateProcessor } from './processors/policy-translate.processor'
 
 const WORKER_ID = `worker-${crypto.randomUUID().slice(0, 8)}`
 
 type Processor = (ctx: ProcessorContext) => Promise<Record<string, unknown>>
 
 const PROCESSORS: Record<string, Processor> = {
-  'genai-refresh':   genaiRefreshProcessor,
-  'coverage-review': coverageReviewProcessor,
-  'evidence-report': evidenceReportProcessor,
-  'policy-pack':     policyPackProcessor,
+  'genai-refresh':    genaiRefreshProcessor,
+  'coverage-review':  coverageReviewProcessor,
+  'evidence-report':  evidenceReportProcessor,
+  'policy-pack':      policyPackProcessor,
+  'policy-translate': policyTranslateProcessor,
 }
 
 interface ClaimedJob {
