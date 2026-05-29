@@ -1,7 +1,7 @@
 import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction } from '../types'
 
-export const ADAPTER_VERSION = '1.2.0'
+export const ADAPTER_VERSION = '1.3.0'
 
 function toNetskopeAction(effataAction: string): string {
   switch (effataAction) {
@@ -98,8 +98,6 @@ export function translate(
       activities:          allowActivities,
       action:              'Allow',
       severity:            'Low',
-      alert:               false,
-      save_evidence:       false,
       notification_template: null,
       policy_type:         'Cloud App Access',
       policy_family:       'Real-time Protection',
@@ -146,9 +144,6 @@ export function translate(
     lossyMappings.push('monitor action mapped to Allow + save_evidence: true (Netskope has no dedicated Monitor action).')
   }
 
-  const saveEvidence = mostRestrictive === 'block' || mostRestrictive === 'alert' || mostRestrictive === 'monitor'
-  const alert        = mostRestrictive === 'block' || mostRestrictive === 'alert'
-
   const notificationTemplate: string | null = mostRestrictive.startsWith('coach')
     ? 'EFFATA-COACH-NOTIFICATION'
     : null
@@ -162,16 +157,11 @@ export function translate(
     dlp_profile:           profileName,
     action:                primaryNativeAction,
     severity,
-    alert,
-    save_evidence:         saveEvidence,
     notification_template: notificationTemplate,
     policy_type:           'Cloud App Access',
     policy_family:         'Real-time Protection',
   }
 
-  if (primaryNativeAction === 'Block' || primaryNativeAction === 'Alert') {
-    exactMappings.push('block/alert → alert: true, save_evidence: true')
-  }
   if (primaryNativeAction === 'Coach') {
     exactMappings.push('coach → notification_template: EFFATA-COACH-NOTIFICATION (must exist in Netskope)')
     testsRequired.push(
