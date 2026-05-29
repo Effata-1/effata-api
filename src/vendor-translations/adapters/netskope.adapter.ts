@@ -42,6 +42,18 @@ export function translate(
   const postPromptAction = resolveAction(policy, 'post_prompt')
   const uploadAction     = resolveAction(policy, 'upload')
   const downloadAction   = resolveAction(policy, 'download')
+  const responseAction   = resolveAction(policy, 'response')
+
+  // Netskope RT policies do not have a "Response" activity — only Post/Upload/Download.
+  // AI output protection (response interception) requires a different approach
+  // (Netskope AI Access Security or a separate download DLP policy for content returning from AI).
+  if (responseAction !== 'not-set') {
+    unsupportedIntent.push(
+      `response activity action "${responseAction}" cannot be mapped — Netskope Real-time Protection policies ` +
+      `do not intercept AI-generated responses. For AI output protection, use Netskope AI Access Security ` +
+      `(separate product capability) or a Download activity policy to inspect content returned from the AI app.`,
+    )
+  }
 
   // Source — default to All Users
   const source = { users_or_groups: ['All Users'] }
