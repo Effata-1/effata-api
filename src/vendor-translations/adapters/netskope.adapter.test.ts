@@ -17,12 +17,12 @@ describe('netskope adapter', () => {
     assert.ok(result.mapping_report.exact_mappings.length > 0)
   })
 
-  test('confidential coach — action is Coach, UserNotification in secondary_actions', () => {
+  test('confidential coach — action is Coach, notification_template set', () => {
     const result = translate(FIXTURES.confidentialCoach, MOCK_REGISTRY)
     const mainPolicy = result.native_policies.find((p: unknown) => (p as Record<string, string>).name?.startsWith('[DLP]')) as Record<string, unknown>
     assert.ok(mainPolicy, 'main [DLP] policy missing')
     assert.equal(mainPolicy.action, 'Coach')
-    assert.ok((mainPolicy.secondary_actions as string[] | undefined)?.includes('UserNotification'), 'UserNotification missing')
+    assert.ok(typeof mainPolicy.notification_template === 'string', 'notification_template missing for coach')
   })
 
   test('approved use allow — scoped Allow rule emitted first, tests_required contains scope warning', () => {
@@ -66,6 +66,17 @@ describe('netskope adapter', () => {
     const dest = mainPolicy.destination as Record<string, unknown>
     assert.ok(Array.isArray(dest.apps), 'apps list missing for scope_app_ids')
     assert.deepEqual(dest.apps, ['chatgpt', 'claude', 'gemini'])
+  })
+
+  test('all policies have source, severity, status, dlp_profile fields', () => {
+    const result = translate(FIXTURES.secretUploadBlock, MOCK_REGISTRY)
+    const mainPolicy = result.native_policies.find((p: unknown) => (p as Record<string, string>).name?.startsWith('[DLP]')) as Record<string, unknown>
+    assert.ok(mainPolicy.source, 'source missing')
+    assert.ok((mainPolicy.source as Record<string, unknown>).users_or_groups, 'source.users_or_groups missing')
+    assert.ok(mainPolicy.severity, 'severity missing')
+    assert.equal(mainPolicy.status, 'enabled')
+    assert.equal(mainPolicy.severity, 'Critical', 'block should map to Critical severity')
+    assert.ok('dlp_profile' in mainPolicy, 'dlp_profile field missing')
   })
 
   test('mapping_report fields are always present', () => {

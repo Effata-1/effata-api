@@ -1,7 +1,37 @@
 import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction } from '../types'
 
-export const ADAPTER_VERSION = '1.0.0'
+export const ADAPTER_VERSION = '1.1.0'
+
+function toNetskopeAction(effataAction: string): string {
+  switch (effataAction) {
+    case 'block':                  return 'Block'
+    case 'coach':
+    case 'coach-ack':
+    case 'coach-just':             return 'Coach'
+    case 'alert':                  return 'Alert'
+    case 'monitor':                return 'Allow'   // Netskope has no Monitor action — Allow + save_evidence
+    case 'allow':                  return 'Allow'
+    default:                       return 'Allow'
+  }
+}
+
+function toSeverity(effataAction: string): string {
+  switch (effataAction) {
+    case 'block':                  return 'Critical'
+    case 'coach':
+    case 'coach-ack':
+    case 'coach-just':
+    case 'alert':                  return 'High'
+    case 'monitor':                return 'Medium'
+    default:                       return 'Low'
+  }
+}
+
+function dlpProfileName(label: string | null): string | null {
+  if (!label || label === 'all') return null
+  return `EFFATA-${label.toUpperCase().replace(/-/g, '_')}`
+}
 
 export function translate(
   policy: NeutralPolicy,
@@ -20,6 +50,12 @@ export function translate(
   const uploadAction     = resolveAction(policy, 'upload')
   const downloadAction   = resolveAction(policy, 'download')
 
+  // Source scope — default to All Users; customer must remap to specific groups
+  const source = { users_or_groups: ['All Users'] }
+  lossyMappings.push(
+    'source defaulted to "All Users" — remap to specific user groups or OUs in Netskope console before enabling.',
+  )
+
   // Build destination scope
   const destination: Record<string, unknown> = policy.scope_all_apps
     ? { app_categories: ['Generative AI'] }
@@ -31,31 +67,46 @@ export function translate(
     exactMappings.push('scope_app_ids → destination.apps')
   }
 
-  // For approved-use policies: emit a tightly-scoped Allow rule first (Netskope first-match top-down)
+  // DLP profile reference
+  const profileName = dlpProfileName(policy.data_classification_label)
+  if (profileName) {
+    exactMappings.push(`data_classification_label → dlp_profile: ${profileName} (must exist in Netskope tenant)`)
+    testsRequired.push(
+      `Create or verify DLP profile "${profileName}" exists in Netskope (Policies → DLP Profiles) and matches the intended data patterns for "${policy.data_classification_label}".`,
+    )
+  }
+
+  // For approved-use: emit a tightly-scoped Allow rule first (Netskope first-match top-down)
   if (policy.policy_type === 'approved-use' || policy.primary_action === 'allow') {
-    const activities: string[] = []
-    if (uploadAction === 'allow')     activities.push('Upload')
-    if (postPromptAction === 'allow') activities.push('Post')
-    if (downloadAction === 'allow')   activities.push('Download')
-    if (activities.length === 0)      activities.push('Upload', 'Post')
+    const allowActivities: string[] = []
+    if (uploadAction === 'allow')     allowActivities.push('Upload')
+    if (postPromptAction === 'allow') allowActivities.push('Post')
+    if (downloadAction === 'allow')   allowActivities.push('Download')
+    if (allowActivities.length === 0) allowActivities.push('Upload', 'Post')
 
     nativePolicies.push({
-      name:          `[Allow] ${policy.name}`,
-      policy_family: 'Real-time Protection',
-      policy_type:   'Cloud App Access',
+      name:                `[Allow] ${policy.name}`,
+      status:              'enabled',
+      source,
       destination,
-      activities,
-      action:        'Allow',
+      activities:          allowActivities,
+      action:              'Allow',
+      severity:            'Low',
+      alert:               false,
+      save_evidence:       false,
+      notification_template: null,
+      policy_type:         'Cloud App Access',
+      policy_family:       'Real-time Protection',
     })
 
     exactMappings.push('approved-use → Allow action')
     testsRequired.push(
-      'Validate allow rule is scoped to approved app instance + approved user group to avoid bypassing downstream DLP controls.',
-      'Verify policy order in Netskope console — Allow rule must sit above block/DLP rules for the same destination.',
+      'Validate allow rule is scoped to an approved app instance + approved user group — a broad Allow above DLP rules can bypass all downstream controls.',
+      'Verify policy order in Netskope console — this Allow rule must sit above block/DLP rules for the same destination.',
     )
   }
 
-  // Build the main enforcement/monitoring policy
+  // Build activities list for the main enforcement policy
   const activities: string[] = []
   const actionMap: Record<string, string> = {}
 
@@ -71,62 +122,78 @@ export function translate(
     activities.push('Download')
     actionMap['Download'] = downloadAction
   }
-
   if (activities.length === 0) activities.push('Upload', 'Post')
 
   // Determine primary native action (most restrictive across resolved activities)
-  const actionsInUse = Object.values(actionMap).filter(a => a !== 'not-set')
-  const primaryNativeAction = actionsInUse.includes('block') ? 'Block'
-    : actionsInUse.some(a => a.startsWith('coach')) ? 'Coach'
-    : actionsInUse.includes('alert') ? 'Alert'
-    : actionsInUse.includes('monitor') ? 'Monitor'
-    : 'Allow'
+  const actionsInUse    = Object.values(actionMap).filter(a => a !== 'not-set')
+  const mostRestrictive = actionsInUse.includes('block') ? 'block'
+    : actionsInUse.some(a => a.startsWith('coach'))      ? 'coach'
+    : actionsInUse.includes('alert')                     ? 'alert'
+    : actionsInUse.includes('monitor')                   ? 'monitor'
+    : 'allow'
 
-  const mainPolicy: Record<string, unknown> = {
-    name:           `[DLP] ${policy.name}`,
-    policy_family:  'Real-time Protection',
-    policy_type:    'Cloud App Access',
-    destination,
-    activities,
-    action:         primaryNativeAction,
+  const primaryNativeAction = toNetskopeAction(mostRestrictive)
+  const severity            = toSeverity(mostRestrictive)
+
+  // Netskope has no "Monitor" action — Allow + save_evidence is the equivalent
+  if (mostRestrictive === 'monitor') {
+    lossyMappings.push('monitor action mapped to Allow + save_evidence: true (Netskope has no dedicated Monitor action).')
   }
 
-  if (policy.data_classification_label && policy.data_classification_label !== 'all') {
-    mainPolicy['profile'] = `EFFATA-${policy.data_classification_label.toUpperCase().replace(/-/g, '_')}`
-    exactMappings.push('data_classification_label → DLP profile name')
+  const saveEvidence = mostRestrictive === 'block' || mostRestrictive === 'alert' || mostRestrictive === 'monitor'
+  const alert        = mostRestrictive === 'block' || mostRestrictive === 'alert'
+
+  const notificationTemplate: string | null = mostRestrictive.startsWith('coach')
+    ? 'EFFATA-COACH-NOTIFICATION'
+    : null
+
+  const mainPolicy: Record<string, unknown> = {
+    name:                  `[DLP] ${policy.name}`,
+    status:                'enabled',
+    source,
+    destination,
+    activities,
+    dlp_profile:           profileName,
+    action:                primaryNativeAction,
+    severity,
+    alert,
+    save_evidence:         saveEvidence,
+    notification_template: notificationTemplate,
+    policy_type:           'Cloud App Access',
+    policy_family:         'Real-time Protection',
   }
 
   if (primaryNativeAction === 'Block' || primaryNativeAction === 'Alert') {
-    mainPolicy['secondary_actions'] = ['Alert']
-    mainPolicy['save_evidence']     = true
-    exactMappings.push('block/alert → save_evidence: true')
+    exactMappings.push('block/alert → alert: true, save_evidence: true')
   }
-
   if (primaryNativeAction === 'Coach') {
-    mainPolicy['secondary_actions'] = ['UserNotification']
-    exactMappings.push('coach → secondary_actions: UserNotification')
+    exactMappings.push('coach → notification_template: EFFATA-COACH-NOTIFICATION (must exist in Netskope)')
+    testsRequired.push(
+      'Create or verify user notification template "EFFATA-COACH-NOTIFICATION" in Netskope (Policies → User Notifications) with the correct coaching message.',
+    )
   }
 
   exactMappings.push('post_prompt → activity Post')
   exactMappings.push('upload → activity Upload')
   exactMappings.push('download → activity Download')
   exactMappings.push('primary_action → action')
-
-  if (policy.rules.some(r => r.data_type.startsWith('clabel:'))) {
-    lossyMappings.push('Sensitivity label conditions (clabel:) require tenant-specific enterprise-classification configuration in Netskope.')
-    unverifiedAreas.push('Public-doc parity for generic label-condition syntax in Netskope.')
-  }
+  exactMappings.push('primary_action → severity')
 
   if (policy.policy_type === 'prohibited') {
-    mainPolicy['action'] = 'Block'
-    exactMappings.push('policy_type prohibited → action Block')
+    mainPolicy['action']   = 'Block'
+    mainPolicy['severity'] = 'Critical'
+    exactMappings.push('policy_type prohibited → action Block, severity Critical')
+  }
+
+  if (policy.rules.some(r => r.data_type.startsWith('clabel:'))) {
+    lossyMappings.push('Sensitivity label conditions (clabel:) require tenant-specific enterprise-classification profile in Netskope — cannot be auto-created.')
+    unverifiedAreas.push('Public-doc parity for generic label-condition syntax in Netskope.')
   }
 
   nativePolicies.push(mainPolicy)
 
   testsRequired.push(
-    'Validate app category coverage includes all target AI apps.',
-    'Validate DLP profile bindings for data classification labels.',
+    'Validate Netskope app category "Generative AI" covers all target AI apps in your tenant (Netskope categories may not include newer apps).',
   )
 
   const hasLossy = lossyMappings.length > 0
