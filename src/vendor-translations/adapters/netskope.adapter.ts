@@ -1,7 +1,7 @@
 import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction } from '../types'
 
-export const ADAPTER_VERSION = '1.1.0'
+export const ADAPTER_VERSION = '1.2.0'
 
 function toNetskopeAction(effataAction: string): string {
   switch (effataAction) {
@@ -57,14 +57,17 @@ export function translate(
   )
 
   // Build destination scope
-  const destination: Record<string, unknown> = policy.scope_all_apps
-    ? { app_categories: ['Generative AI'] }
-    : { apps: policy.scope_app_ids }
-
+  // When scope_all_apps is false but no specific apps listed, fall back to Generative AI category
+  let destination: Record<string, unknown>
   if (policy.scope_all_apps) {
+    destination = { app_categories: ['Generative AI'] }
     exactMappings.push('scope_all_apps → destination.app_categories: Generative AI')
-  } else {
+  } else if (policy.scope_app_ids.length > 0) {
+    destination = { apps: policy.scope_app_ids }
     exactMappings.push('scope_app_ids → destination.apps')
+  } else {
+    destination = { app_categories: ['Generative AI'] }
+    lossyMappings.push('No specific apps scoped — destination defaulted to Generative AI app category. Define specific app instances in Netskope if needed.')
   }
 
   // DLP profile reference
@@ -74,6 +77,9 @@ export function translate(
     testsRequired.push(
       `Create or verify DLP profile "${profileName}" exists in Netskope (Policies → DLP Profiles) and matches the intended data patterns for "${policy.data_classification_label}".`,
     )
+  } else {
+    // No classification label — policy matches ALL content for the specified activities
+    lossyMappings.push('No data_classification_label set — dlp_profile is null, meaning this policy matches ALL content for the specified activities. Add a DLP profile if content inspection is required.')
   }
 
   // For approved-use: emit a tightly-scoped Allow rule first (Netskope first-match top-down)
