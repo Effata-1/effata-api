@@ -18,7 +18,7 @@ const contextSchema = z.object({
     key:         z.string(),
     name:        z.string(),
     sensitivity: z.string(),
-  })).max(50).optional(),
+  })).optional(),
   actions:    z.array(z.string()).optional(),
   activities: z.array(z.string()).optional(),
   vendors:    z.array(z.string()).optional(),
