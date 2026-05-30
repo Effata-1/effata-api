@@ -76,7 +76,7 @@ export const NeutralPolicyV1Schema = z.object({
     app_categories: z.array(NeutralAppCategorySchema),
     app_instances:  z.array(z.string()),
     channels:       z.array(z.enum(['web', 'saas_api', 'email', 'endpoint', 'copilot', 'chat', 'files', 'browser'])).min(1),
-    activities:     z.array(z.enum(['browse', 'upload', 'download', 'share', 'post', 'copy_paste', 'print', 'move', 'delete', 'email_send', 'prompt_submit'])).min(1),
+    activities:     z.array(z.enum(['browse', 'login', 'upload', 'download', 'share', 'post', 'copy_paste', 'print', 'move', 'delete', 'email_send', 'prompt_submit'])).min(1),
   }),
   content: z.object({
     operator:   z.enum(['any', 'all']),

@@ -4,7 +4,7 @@ import { validateNeutralPolicy } from '../../neutral-policies/schema'
 import { NETSKOPE_CATALOG, CATALOG_VERSION } from '../catalogs/netskope.catalog'
 import { findMapping } from '../customer-mappings'
 
-export const ADAPTER_VERSION = '4.0.1'
+export const ADAPTER_VERSION = '4.0.2'
 
 function toNetskopeAction(effataAction: string): string {
   switch (effataAction) {
