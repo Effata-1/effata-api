@@ -192,6 +192,20 @@ router.post('/evaluate', requireRole('analyst'), async (req, res, next) => {
       },
     })
   } catch (err) {
+    // Translate Anthropic SDK errors to clear messages the frontend can classify
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('authentication_error') || msg.includes('invalid x-api-key') || msg.includes('401')) {
+      return res.status(503).json({ error: 'authentication_error: AI service credentials are invalid. Contact your administrator.' })
+    }
+    if (msg.includes('rate_limit') || msg.includes('429')) {
+      return res.status(503).json({ error: 'rate_limit_error: AI service rate limit exceeded. Try again in a moment.' })
+    }
+    if (msg.includes('overloaded') || msg.includes('529')) {
+      return res.status(503).json({ error: 'api_error: AI service is temporarily overloaded. Try again shortly.' })
+    }
+    if (err instanceof Error && err.name === 'AbortError') {
+      return res.status(503).json({ error: 'AbortError: Evaluation timed out after 90 seconds.' })
+    }
     next(err)
   }
 })

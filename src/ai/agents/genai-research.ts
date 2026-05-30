@@ -71,9 +71,9 @@ Return a JSON object with exactly this structure:
       { signal: controller.signal },
     )
 
-    const raw = response.content[0].type === 'text' ? response.content[0].text : ''
+    const raw = response.content[0].type === 'text' ? response.content[0].text : '{}'
     return {
-      result: parseAiJson(raw),
+      result: parseAiJson(raw, '{}'),
       inputTokens:  response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
     }
