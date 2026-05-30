@@ -9,11 +9,13 @@ export interface MappingReport {
 }
 
 export interface TranslationResult {
-  vendor: string
+  vendor:           string
   /** success = fully mapped; partial = translated but lossy/unverified; deferred = vendor not supported */
-  status: 'success' | 'partial' | 'deferred'
-  native_policies: object[]
-  mapping_report: MappingReport
+  status:           'success' | 'partial' | 'deferred'
+  /** Vendor catalog version used at translation time — stored in capability_registry_version. Empty string for non-catalog vendors. */
+  catalog_version:  string
+  native_policies:  object[]
+  mapping_report:   MappingReport
 }
 
 export interface PolicyRule {

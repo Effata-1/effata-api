@@ -184,6 +184,7 @@ export function translate(
 
   return {
     vendor:          'skyhigh-security',
+    catalog_version: '',
     status:          'partial',
     native_policies: [inlinePolicy, apiPolicy],
     mapping_report: {

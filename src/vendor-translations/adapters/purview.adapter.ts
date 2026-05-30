@@ -167,6 +167,7 @@ export function translate(
 
   return {
     vendor:          'microsoft-purview',
+    catalog_version: '',
     status:          'partial',
     native_policies: nativePolicies,
     mapping_report: {

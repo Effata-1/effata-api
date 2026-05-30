@@ -164,6 +164,7 @@ export function translate(
 
   return {
     vendor:          'forcepoint-dlp',
+    catalog_version: '',
     status:          hasLossy ? 'partial' : 'success',
     native_policies: [nativePolicy],
     mapping_report: {

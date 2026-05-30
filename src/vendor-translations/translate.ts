@@ -52,6 +52,7 @@ export function translateForVendor(
     return {
       result: {
         vendor:          vendorId,
+        catalog_version: '',
         status:          'deferred',
         native_policies: [],
         mapping_report: {
@@ -73,7 +74,8 @@ export function translateForVendor(
   return {
     result,
     adapterVersion:  adapter.ADAPTER_VERSION,
-    registryVersion: registry.version,
+    // Prefer the catalog version from the adapter result over the generic DB registry version
+    registryVersion: result.catalog_version || registry.version,
     policyHash:      computePolicyHash(policy),
   }
 }

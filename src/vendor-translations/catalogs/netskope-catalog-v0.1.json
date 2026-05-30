@@ -1,0 +1,1504 @@
+{
+  "schema_version": "vendor_catalog_seed_v0.1",
+  "vendor_catalog": {
+    "vendor_id": "netskope",
+    "vendor_name": "Netskope",
+    "catalog_version": "0.1",
+    "adapter_version_target": "netskope-adapter-v0.1",
+    "source_type": "public_docs_research",
+    "status": "draft_seed",
+    "last_verified_at": "2026-05-30",
+    "next_review_due": "2026-08-30",
+    "review_cycle": {
+      "high_change_areas": "3 months",
+      "stable_areas": "6 months"
+    },
+    "notes": [
+      "This seed catalog is derived from the Netskope Vendor Field Catalog research report.",
+      "It is not a tenant export and must not be treated as proof of customer-specific configuration.",
+      "Inline Real-time Protection and API Data Protection are modeled separately through execution_mode.",
+      "App-specific activity support must be verified per tenant/app before marking a translation exact."
+    ]
+  },
+  "policy_objects": [
+    {
+      "object_key": "steering_configuration",
+      "object_type": "prerequisite_object",
+      "display_name": "Steering Configuration",
+      "description": "Determines which traffic reaches Netskope for inline real-time policy evaluation.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "console_location": "Traffic Steering / Steering Configuration",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "real_time_protection_policy",
+      "object_type": "policy",
+      "display_name": "Real-time Protection Policy",
+      "description": "Inline policy surface for live web/cloud traffic using source, destination, activity, profile, action, and notification selectors.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "console_location": "Policies / Real-time Protection",
+      "reusable": false,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "api_data_protection_policy",
+      "object_type": "policy",
+      "display_name": "API Data Protection Policy",
+      "description": "Out-of-band SaaS/data-at-rest policy surface using object/resource selection, criteria, profiles, actions, notifications, and deferred follow-up actions.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "console_location": "Policies / API Data Protection",
+      "reusable": false,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "dlp_profile",
+      "object_type": "detection_profile",
+      "display_name": "DLP Profile",
+      "description": "Reusable detection bundle referenced by policies; may contain DLP rules, file profiles, ML classifiers, fingerprint rules, and exact match logic.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Data Loss Prevention / DLP Profiles",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "dlp_rule",
+      "object_type": "detection_rule",
+      "display_name": "DLP Rule",
+      "description": "Rule-level detector logic using data identifiers, dictionaries, expressions, thresholds, and unique-count options.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Data Loss Prevention / DLP Rules",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "dlp_entity",
+      "object_type": "detection_entity",
+      "display_name": "DLP Entity / Data Identifier",
+      "description": "Lowest-level detection input such as predefined identifier, keyword, regex, dictionary, weighted dictionary, or exact-match reference.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Data Loss Prevention / DLP Entities",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "file_profile",
+      "object_type": "detection_profile",
+      "display_name": "File Profile",
+      "description": "File metadata/profile object supporting file name/extension, file type, file hash, object ID, file size, protected/encrypted flags, and sensitivity labels.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Real-time Protection / Profiles / File Profile",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "app_instance",
+      "object_type": "destination_scope",
+      "display_name": "App Instance / App Instance Tag",
+      "description": "Object used to distinguish sanctioned, unsanctioned, untagged, tenant-specific, personal, or enterprise app instances where supported.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Settings / App Instances or policy destination selectors",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "custom_category",
+      "object_type": "destination_scope",
+      "display_name": "Custom Category",
+      "description": "Reusable category selector, often backed by URL Lists, used to target custom destination sets in policies.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "console_location": "Policies / Custom Categories",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "url_list",
+      "object_type": "destination_scope",
+      "display_name": "URL List",
+      "description": "Exact or regex URL/IP list that can be attached to custom categories and later used in policy targeting.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "console_location": "Policies / URL Lists / Custom Categories",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "medium"
+    },
+    {
+      "object_key": "policy_notification_template",
+      "object_type": "workflow",
+      "display_name": "Policy Notification Template",
+      "description": "User/admin notification template for alert/block/coaching workflows, including justification boxes, user actions, redirects, and variables.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Real-time Protection / Policy Notification Templates",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    },
+    {
+      "object_key": "forensic_profile",
+      "object_type": "evidence",
+      "display_name": "Forensic Profile",
+      "description": "Profile defining where forensic content is stored and whether it is encrypted.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Data Security / Forensics",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "medium"
+    },
+    {
+      "object_key": "quarantine_profile",
+      "object_type": "remediation_profile",
+      "display_name": "Quarantine Profile",
+      "description": "Profile defining quarantine destination app/instance/folder/owner, encryption, admin notifications, and tombstone behavior.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Real-time Protection / Profiles / Quarantine Profile",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "medium"
+    },
+    {
+      "object_key": "legal_hold_profile",
+      "object_type": "remediation_profile",
+      "display_name": "Legal Hold Profile",
+      "description": "Profile/action family for legal-hold preservation. Existence is confirmed, but detailed public field schema requires tenant/API verification.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "console_location": "API Data Protection / Legal Hold",
+      "reusable": true,
+      "customer_specific": true,
+      "verification_status": "partially_verified_public_docs",
+      "seed_priority": "medium"
+    },
+    {
+      "object_key": "dlp_incident",
+      "object_type": "evidence_record",
+      "display_name": "DLP Incident / Alert",
+      "description": "Downstream incident/evidence record created by DLP profiles, rules, file profiles, classifiers, fingerprints, or actions.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "console_location": "Incidents / DLP",
+      "reusable": false,
+      "customer_specific": false,
+      "verification_status": "confirmed_public_docs",
+      "seed_priority": "high"
+    }
+  ],
+  "activities": [
+    {
+      "activity_key": "browse",
+      "vendor_activity_name": "Browse",
+      "display_name": "Browse / Access",
+      "description": "Represents web/app browsing or access behavior. Public docs note browse has special event behavior and may not generate alert events in some policy contexts.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "support_level": "partially_supported",
+      "policy_selectable": "context_dependent",
+      "event_emission_behavior": "special_case",
+      "requires_dlp": false,
+      "supported_for_genai": "partially_verified",
+      "limitations": [
+        "Browse behavior differs from content activities and may not always appear as a policy event."
+      ],
+      "verification_status": "confirmed_with_limitations"
+    },
+    {
+      "activity_key": "login",
+      "vendor_activity_name": "Login / Login Attempt / Login Successful",
+      "display_name": "Login",
+      "description": "Authentication-related activity family confirmed in Universal Connector documentation.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "support_level": "supported",
+      "policy_selectable": "context_dependent",
+      "event_emission_behavior": "connector_dependent",
+      "requires_dlp": false,
+      "supported_for_genai": "requires_tenant_validation",
+      "limitations": [
+        "Login visibility depends on connector/app support."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "activity_key": "formpost",
+      "vendor_activity_name": "Formpost",
+      "display_name": "Form Post / Prompt Submit",
+      "description": "Submission activity for posted form content; Universal/Web Universal connector supports Formpost with DLP only.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "support_level": "supported",
+      "policy_selectable": "context_dependent",
+      "event_emission_behavior": "policy_event_when_matched",
+      "requires_dlp": true,
+      "supported_for_genai": "requires_tenant_validation",
+      "limitations": [
+        "Activity extraction depends on app/connector; GenAI prompt mapping must be validated by app."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "activity_key": "post",
+      "vendor_activity_name": "Post / App-specific post",
+      "display_name": "Post",
+      "description": "App-specific post/comment/content-submission activity, depending on app connector support.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "support_level": "partially_supported",
+      "policy_selectable": "app_specific",
+      "event_emission_behavior": "app_specific",
+      "requires_dlp": "context_dependent",
+      "supported_for_genai": "partially_verified",
+      "limitations": [
+        "No single global public activity enum guarantees Post across all selected apps/categories."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    },
+    {
+      "activity_key": "upload",
+      "vendor_activity_name": "Upload",
+      "display_name": "Upload",
+      "description": "File upload or attachment submission activity. Widely used inline primitive and relevant for GenAI attachments/uploads.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "support_level": "supported",
+      "policy_selectable": "context_dependent",
+      "event_emission_behavior": "policy_event_when_matched",
+      "requires_dlp": false,
+      "supported_for_genai": "partially_verified",
+      "limitations": [
+        "App/category selection may show union of activity support; selected app may not support Upload."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "activity_key": "download",
+      "vendor_activity_name": "Download",
+      "display_name": "Download",
+      "description": "File download activity. Relevant for file movement and some API/data-at-rest contexts.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "support_level": "supported",
+      "policy_selectable": "context_dependent",
+      "event_emission_behavior": "policy_event_when_matched",
+      "requires_dlp": false,
+      "supported_for_genai": "requires_tenant_validation",
+      "limitations": [
+        "Should not be assumed for GenAI submission policies unless explicitly present in the policy intent."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "activity_key": "response",
+      "vendor_activity_name": "AI Response / Agent Response",
+      "display_name": "AI Response",
+      "description": "AI-generated response resource type/activity in GenAI API monitoring, publicly confirmed for certain enterprise GenAI integrations such as Microsoft Copilot and Claude/ChatGPT enterprise monitored activities.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "support_level": "partially_supported",
+      "policy_selectable": "genai_app_specific",
+      "event_emission_behavior": "api_scan_event",
+      "requires_dlp": "context_dependent",
+      "supported_for_genai": "partially_verified",
+      "limitations": [
+        "Do not assume inline response inspection across all GenAI apps; validate per app and control plane."
+      ],
+      "verification_status": "confirmed_for_some_genai_api_contexts"
+    },
+    {
+      "activity_key": "share",
+      "vendor_activity_name": "Share / Collaborator / Exposure Change",
+      "display_name": "Share",
+      "description": "Collaboration or sharing-related activity/resource criteria, more common in API Data Protection.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "support_level": "app_specific",
+      "policy_selectable": "app_specific",
+      "event_emission_behavior": "api_scan_event",
+      "requires_dlp": false,
+      "supported_for_genai": "not_publicly_verified",
+      "limitations": [
+        "Support varies by SaaS app/resource type."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    },
+    {
+      "activity_key": "edit",
+      "vendor_activity_name": "Edit / Update",
+      "display_name": "Edit / Update",
+      "description": "Object update activity in app-specific or API-monitored contexts.",
+      "execution_modes": [
+        "api_data_protection",
+        "inline_real_time"
+      ],
+      "support_level": "app_specific",
+      "policy_selectable": "app_specific",
+      "event_emission_behavior": "app_specific",
+      "requires_dlp": "context_dependent",
+      "supported_for_genai": "partially_verified",
+      "limitations": [
+        "Must be validated against the selected app/resource type."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    },
+    {
+      "activity_key": "create",
+      "vendor_activity_name": "Create",
+      "display_name": "Create",
+      "description": "Object creation event in API or app-specific monitoring.",
+      "execution_modes": [
+        "api_data_protection",
+        "inline_real_time"
+      ],
+      "support_level": "app_specific",
+      "policy_selectable": "app_specific",
+      "event_emission_behavior": "app_specific",
+      "requires_dlp": "context_dependent",
+      "supported_for_genai": "partially_verified",
+      "limitations": [
+        "Often app/resource-specific."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    },
+    {
+      "activity_key": "delete",
+      "vendor_activity_name": "Delete",
+      "display_name": "Delete",
+      "description": "Object deletion activity in API/app-specific contexts.",
+      "execution_modes": [
+        "api_data_protection",
+        "inline_real_time"
+      ],
+      "support_level": "app_specific",
+      "policy_selectable": "app_specific",
+      "event_emission_behavior": "app_specific",
+      "requires_dlp": false,
+      "supported_for_genai": "not_publicly_verified",
+      "limitations": [
+        "Not normally used for GenAI DLP submission controls."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    },
+    {
+      "activity_key": "copy_paste",
+      "vendor_activity_name": "Copy / Paste",
+      "display_name": "Copy / Paste",
+      "description": "Copy/paste support is confirmed in specific Google Suite inline DLP contexts with minimum character requirements.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "support_level": "app_specific",
+      "policy_selectable": "app_specific",
+      "event_emission_behavior": "app_specific",
+      "requires_dlp": true,
+      "supported_for_genai": "not_publicly_verified",
+      "limitations": [
+        "Do not treat as universal; Google Suite docs mention 50 character minimum for paste inspection."
+      ],
+      "verification_status": "confirmed_app_specific"
+    },
+    {
+      "activity_key": "print",
+      "vendor_activity_name": "Print / Disable Print",
+      "display_name": "Print",
+      "description": "Print-related control appears as an API Data Protection remediation/action capability in some contexts.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "support_level": "app_specific",
+      "policy_selectable": "app_specific",
+      "event_emission_behavior": "api_remediation_context",
+      "requires_dlp": false,
+      "supported_for_genai": "not_publicly_verified",
+      "limitations": [
+        "Typically an API/remediation control, not a generic inline GenAI activity."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    }
+  ],
+  "actions": [
+    {
+      "action_key": "allow",
+      "vendor_action_name": "Allow",
+      "display_name": "Allow",
+      "description": "Permits the activity/content; often used as explicit allow or default pass-through behavior.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "supported_policy_types": [
+        "access",
+        "activity",
+        "dlp"
+      ],
+      "user_interaction": false,
+      "creates_alert": false,
+      "creates_incident": false,
+      "supports_evidence_capture": false,
+      "dependencies": [],
+      "limitations": [
+        "Broad allow policies must be ordered carefully to avoid bypassing downstream DLP."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "action_key": "alert",
+      "vendor_action_name": "Alert",
+      "display_name": "Alert / Monitor",
+      "description": "Generates alert/incident visibility without preventing user action where supported.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "supported_policy_types": [
+        "access",
+        "activity",
+        "dlp",
+        "api"
+      ],
+      "user_interaction": false,
+      "creates_alert": true,
+      "creates_incident": "dlp_context_dependent",
+      "supports_evidence_capture": "with_dlp_forensics_if_configured",
+      "dependencies": [],
+      "limitations": [
+        "Alert on Browse may not generate alert events in some documented contexts."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "action_key": "user_alert",
+      "vendor_action_name": "User Alert",
+      "display_name": "Coach / User Alert",
+      "description": "Shows user notification/coaching and may allow the user to proceed or stop depending on template/action design.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "supported_policy_types": [
+        "activity",
+        "dlp"
+      ],
+      "user_interaction": true,
+      "creates_alert": true,
+      "creates_incident": "dlp_context_dependent",
+      "supports_evidence_capture": "with_dlp_forensics_if_configured",
+      "dependencies": [
+        "policy_notification_template"
+      ],
+      "limitations": [
+        "Reverse proxy blocked apps may show application error instead of block template in some cases."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "action_key": "block",
+      "vendor_action_name": "Block",
+      "display_name": "Block",
+      "description": "Prevents the user activity or policy match. Can use notification templates and may optionally suppress alerts.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "supported_policy_types": [
+        "access",
+        "activity",
+        "dlp"
+      ],
+      "user_interaction": "template_dependent",
+      "creates_alert": true,
+      "creates_incident": "dlp_context_dependent",
+      "supports_evidence_capture": "with_dlp_forensics_if_configured",
+      "dependencies": [
+        "policy_notification_template_optional"
+      ],
+      "limitations": [
+        "Block behavior depends on access method/app; app/page events may still be generated even if alerts are suppressed."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "action_key": "quarantine",
+      "vendor_action_name": "Quarantine",
+      "display_name": "Quarantine",
+      "description": "Moves content to a quarantine destination/profile where supported.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "supported_policy_types": [
+        "dlp",
+        "api"
+      ],
+      "user_interaction": false,
+      "creates_alert": true,
+      "creates_incident": true,
+      "supports_evidence_capture": true,
+      "dependencies": [
+        "quarantine_profile"
+      ],
+      "limitations": [
+        "Inline quarantine is available only when DLP is in the policy and only for upload activity."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "action_key": "encryption",
+      "vendor_action_name": "Encryption",
+      "display_name": "Encryption",
+      "description": "Encrypts content where supported.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "supported_policy_types": [
+        "dlp",
+        "api"
+      ],
+      "user_interaction": false,
+      "creates_alert": true,
+      "creates_incident": true,
+      "supports_evidence_capture": "context_dependent",
+      "dependencies": [
+        "app_instance"
+      ],
+      "limitations": [
+        "Inline encryption is available only when an app instance of a cloud app is selected and only for upload activity."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "action_key": "legal_hold",
+      "vendor_action_name": "Legal Hold",
+      "display_name": "Legal Hold",
+      "description": "Preserves matching content for legal hold workflows.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "supported_policy_types": [
+        "api"
+      ],
+      "user_interaction": false,
+      "creates_alert": true,
+      "creates_incident": true,
+      "supports_evidence_capture": true,
+      "dependencies": [
+        "legal_hold_profile"
+      ],
+      "limitations": [
+        "Detailed profile fields are not fully verified from public docs in the research pass."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    },
+    {
+      "action_key": "apply_sensitivity_label",
+      "vendor_action_name": "Apply Sensitivity Label",
+      "display_name": "Apply Sensitivity Label",
+      "description": "Applies a sensitivity label through API Data Protection workflows where supported.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "supported_policy_types": [
+        "api"
+      ],
+      "user_interaction": false,
+      "creates_alert": true,
+      "creates_incident": true,
+      "supports_evidence_capture": "context_dependent",
+      "dependencies": [
+        "label_integration",
+        "supported_app"
+      ],
+      "limitations": [
+        "Action support varies by app; selecting all applications may disable actions not supported across all apps."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "action_key": "restrict_access",
+      "vendor_action_name": "Restrict Access / Revoke Sharing",
+      "display_name": "Restrict Access / Revoke Sharing",
+      "description": "Restricts sharing, revokes public/org-wide/user access, sets link expiration, or limits view/download rights in API Data Protection where supported.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "supported_policy_types": [
+        "api"
+      ],
+      "user_interaction": false,
+      "creates_alert": true,
+      "creates_incident": true,
+      "supports_evidence_capture": "context_dependent",
+      "dependencies": [
+        "supported_app",
+        "resource_type"
+      ],
+      "limitations": [
+        "Action support varies significantly by SaaS app and resource type."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "action_key": "delete",
+      "vendor_action_name": "Delete",
+      "display_name": "Delete",
+      "description": "Deletes matching resource/content through API Data Protection where supported.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "supported_policy_types": [
+        "api"
+      ],
+      "user_interaction": false,
+      "creates_alert": true,
+      "creates_incident": true,
+      "supports_evidence_capture": "context_dependent",
+      "dependencies": [
+        "supported_app",
+        "resource_type"
+      ],
+      "limitations": [
+        "High-impact action; support varies by app and should require explicit review."
+      ],
+      "verification_status": "confirmed_public_docs"
+    }
+  ],
+  "detection_objects": [
+    {
+      "detector_key": "dlp_profile",
+      "display_name": "DLP Profile",
+      "description": "Reusable profile containing DLP rules, file profiles, ML classifiers, and fingerprint/exact match components.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "DLP Profile",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Policy can only enforce what the underlying profile/rules detect."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "dlp_rule",
+      "display_name": "DLP Rule",
+      "description": "DLP logic layer with rules, severity thresholds, record/aggregate score modes, unique-count options, and expressions.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "DLP Rule",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Rules within a condition are ANDed; conditions are ORed across the profile."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "data_identifier",
+      "display_name": "Data Identifier",
+      "description": "Predefined identifier, keyword, regex, or other low-level entity used by DLP rules.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "Data Identifier",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Complex validation and filters such as Luhn/Common-Sense must be captured at rule/entity level."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "dictionary",
+      "display_name": "Dictionary",
+      "description": "Keyword or regex dictionary, including weighted dictionary behavior.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "Dictionary",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Weights can affect aggregate score; not the same as simple keyword matching."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "advanced_expression",
+      "display_name": "Advanced Expression",
+      "description": "Composes identifiers with AND, OR, NOT, NEAR, and GDI-style expressions.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "DLP Rule Expression",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "NEAR has a documented maximum of 1000 characters."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "exact_match_dataset",
+      "display_name": "Exact Match Dataset",
+      "description": "Exact-match dataset using uploaded CSV/TXT with headers, normalization, column groups, and SHA-256 hashing.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "Exact Match Dataset",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "File upload path has size constraints; larger datasets may require virtual appliance path and tenant validation."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "file_profile",
+      "display_name": "File Profile",
+      "description": "Matches file name/extension, file type, file hash, object ID, file size, protected/encrypted flags, and sensitivity labels.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "File Profile",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Some attributes are OR-style while size/protected/label constraints are AND-style; model carefully."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "sensitivity_label",
+      "display_name": "Sensitivity Label / MIP Label",
+      "description": "File Profile sensitivity label matching using vendor, instance, and label selection, including files with/without labels from an instance.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "File Profile Sensitivity Label",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Requires metadata visibility and correct label/instance mapping."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "filename_pattern",
+      "display_name": "Filename / File Name Pattern",
+      "description": "File Profile matching on name or extension, usable for filename-driven controls if configured explicitly.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "File Profile Name/Extension",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Do not translate filename intent into broad DLP block without a file profile condition."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "detector_key": "ml_file_classifier",
+      "display_name": "ML File Classifier",
+      "description": "ML-based file classifier referenced by DLP profiles/incidents.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "ML File Classifier",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Detailed public field schema not fully verified in the research pass."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    },
+    {
+      "detector_key": "fingerprint_rule",
+      "display_name": "Fingerprint Rule",
+      "description": "Fingerprint detection rule referenced in DLP profiles/incidents.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "vendor_object_type": "Fingerprint Rule",
+      "reusable": true,
+      "supports_inline": true,
+      "supports_api": true,
+      "limitations": [
+        "Detailed public field schema requires tenant/API validation."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    }
+  ],
+  "app_scope_objects": [
+    {
+      "scope_key": "cloud_app",
+      "display_name": "Cloud App",
+      "description": "Netskope application selector for cloud/SaaS apps.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "customer_specific_mapping_required": true,
+      "supports_real_time": true,
+      "supports_api": true,
+      "limitations": [
+        "Activity support depends on connector/app."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "scope_key": "category",
+      "display_name": "Category",
+      "description": "Netskope category selector, including predefined categories.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "customer_specific_mapping_required": true,
+      "supports_real_time": true,
+      "supports_api": true,
+      "limitations": [
+        "Category-level activity selector may show union support that individual apps do not all support."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "scope_key": "custom_category",
+      "display_name": "Custom Category",
+      "description": "Customer-defined category, often backed by URL Lists, selectable in Real-time Protection categories.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "customer_specific_mapping_required": true,
+      "supports_real_time": true,
+      "supports_api": false,
+      "limitations": [
+        "Requires correct URL list/category maintenance; may require SWG licensing."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "scope_key": "url_list",
+      "display_name": "URL List",
+      "description": "Exact or regex URL/IP list used to build custom categories.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "customer_specific_mapping_required": true,
+      "supports_real_time": "via_custom_category",
+      "supports_api": false,
+      "limitations": [
+        "Typically not a direct inline DLP policy field; used through custom categories."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "scope_key": "app_instance",
+      "display_name": "App Instance",
+      "description": "Specific app instance / tenant / account selector used to distinguish enterprise vs personal or sanctioned vs unsanctioned contexts.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "customer_specific_mapping_required": true,
+      "supports_real_time": true,
+      "supports_api": true,
+      "limitations": [
+        "Some detailed profile fields require tenant validation."
+      ],
+      "verification_status": "partially_verified_public_docs"
+    },
+    {
+      "scope_key": "app_instance_tag",
+      "display_name": "App Instance Tag",
+      "description": "Tag-based app instance grouping, including sanctioned/unsanctioned/untagged states.",
+      "execution_modes": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "customer_specific_mapping_required": true,
+      "supports_real_time": true,
+      "supports_api": true,
+      "limitations": [
+        "Correct tagging and instance discovery are prerequisites for accurate policy scope."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "scope_key": "cci_app_tag",
+      "display_name": "CCI App Tag",
+      "description": "Netskope Cloud Confidence Index app tag used as a destination/app selector in policies.",
+      "execution_modes": [
+        "inline_real_time"
+      ],
+      "customer_specific_mapping_required": false,
+      "supports_real_time": true,
+      "supports_api": "not_publicly_verified",
+      "limitations": [
+        "Mapping from generic tags to exact GenAI governance categories may be lossy."
+      ],
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "scope_key": "specific_resource",
+      "display_name": "Specific Resource / Resource ID",
+      "description": "API Data Protection selector for specific resource IDs or resource filters.",
+      "execution_modes": [
+        "api_data_protection"
+      ],
+      "customer_specific_mapping_required": true,
+      "supports_real_time": false,
+      "supports_api": true,
+      "limitations": [
+        "Resource type and ID semantics vary by connected SaaS app."
+      ],
+      "verification_status": "confirmed_public_docs"
+    }
+  ],
+  "limitations": [
+    {
+      "limitation_key": "activity_support_varies_by_app",
+      "title": "Activity support varies by app and connector",
+      "description": "The visible activity list can be the union of activities supported by selected apps/categories; not every selected app supports every activity.",
+      "impact": "Translator must not assume Post/Upload/Download/Response are always available for a category.",
+      "affected_objects": [
+        "activities",
+        "real_time_protection_policy",
+        "api_data_protection_policy"
+      ],
+      "recommended_warning": "Validate activity support for the selected app/category before marking this mapping exact.",
+      "validation_method": "Tenant UI activity support dialog, app connector docs, or policy test.",
+      "severity": "high",
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "limitation_key": "browse_event_behavior_special",
+      "title": "Browse activity has special event behavior",
+      "description": "Browse is visible in monitoring contexts but may not behave like DLP content activities and may not generate alert events in some configurations.",
+      "impact": "Access-control translations should treat browse differently from content submission activities.",
+      "affected_objects": [
+        "activities",
+        "actions",
+        "incident_record"
+      ],
+      "recommended_warning": "Browse/access policy should be validated with expected event/alert behavior.",
+      "validation_method": "Policy test and event log review.",
+      "severity": "medium",
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "limitation_key": "genai_response_not_universal_inline",
+      "title": "GenAI response inspection is not universally verified for inline policies",
+      "description": "Public docs confirm AI response/resource monitoring in certain API/enterprise GenAI contexts, but this should not be assumed for all inline GenAI traffic.",
+      "impact": "Response activity should not be added to translated policies unless the neutral policy explicitly requires it and the vendor capability is verified.",
+      "affected_objects": [
+        "activities",
+        "api_data_protection_policy"
+      ],
+      "recommended_warning": "AI response inspection requires app/control-plane validation.",
+      "validation_method": "Tenant test with target GenAI app and policy surface.",
+      "severity": "high",
+      "verification_status": "confirmed_for_some_contexts"
+    },
+    {
+      "limitation_key": "generic_genai_category_mapping_lossy",
+      "title": "Generic GenAI category mapping is lossy",
+      "description": "Mapping a specific governance category such as Prohibited or Restricted/Unassessed to a generic Generative AI category loses policy intent.",
+      "impact": "Translator should mark generic category mapping as lossy unless a customer-specific app category/object mapping exists.",
+      "affected_objects": [
+        "app_scope_objects",
+        "vendor_translation"
+      ],
+      "recommended_warning": "Customer vendor mapping is required for exact GenAI category scope.",
+      "validation_method": "Verify org_vendor_object_mappings for category/app list.",
+      "severity": "high",
+      "verification_status": "design_rule_from_confirmed_model"
+    },
+    {
+      "limitation_key": "ssl_dnd_bypasses_inspection",
+      "title": "SSL Do Not Decrypt can prevent inspection",
+      "description": "Traffic that is not decrypted or is bypassed may not be eligible for full DLP inspection.",
+      "impact": "DLP profile/action may not trigger even if policy exists.",
+      "affected_objects": [
+        "steering_configuration",
+        "real_time_protection_policy",
+        "dlp_profile"
+      ],
+      "recommended_warning": "Confirm SSL inspection and DND exceptions before verifying this policy.",
+      "validation_method": "Steering config review and live test.",
+      "severity": "critical",
+      "verification_status": "confirmed_operational_dependency"
+    },
+    {
+      "limitation_key": "certificate_pinned_apps",
+      "title": "Certificate-pinned apps may bypass inspection",
+      "description": "Some apps/clients may not tolerate standard inspection and can require bypass or special handling.",
+      "impact": "Inline DLP controls may not apply to pinned client traffic.",
+      "affected_objects": [
+        "steering_configuration",
+        "app_connector",
+        "real_time_protection_policy"
+      ],
+      "recommended_warning": "Validate traffic path for certificate-pinned clients before relying on inline inspection.",
+      "validation_method": "Client traffic test and connection logs.",
+      "severity": "high",
+      "verification_status": "operational_best_practice"
+    },
+    {
+      "limitation_key": "filename_requires_file_profile",
+      "title": "Filename detection requires a real file profile condition",
+      "description": "Filename intent must translate into File Profile name/extension matching rather than a broad DLP policy with no condition.",
+      "impact": "Incorrect translation can overblock all uploads.",
+      "affected_objects": [
+        "file_profile",
+        "filename_pattern",
+        "real_time_protection_policy"
+      ],
+      "recommended_warning": "Filename detection requires configured File Profile matching the filename pattern.",
+      "validation_method": "Verify File Profile configuration and upload test.",
+      "severity": "critical",
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "limitation_key": "label_detection_requires_metadata_visibility",
+      "title": "Sensitivity label detection requires metadata visibility",
+      "description": "Label detection depends on file metadata visibility and correct vendor/instance/label mapping.",
+      "impact": "Label-based controls may not trigger if metadata is missing, stripped, encrypted, or unmapped.",
+      "affected_objects": [
+        "file_profile",
+        "sensitivity_label",
+        "app_instance"
+      ],
+      "recommended_warning": "Validate label metadata detection with real labelled test files.",
+      "validation_method": "Upload labelled file and confirm incident/policy match.",
+      "severity": "high",
+      "verification_status": "confirmed_public_docs"
+    },
+    {
+      "limitation_key": "allow_policy_order_risk",
+      "title": "Broad allow policies can bypass downstream controls",
+      "description": "Allow/bypass policies can suppress or bypass downstream inspection if ordered or scoped incorrectly.",
+      "impact": "Approved-use translations require app instance/user group validation and policy-order review.",
+      "affected_objects": [
+        "actions",
+        "policy_order",
+        "app_instance"
+      ],
+      "recommended_warning": "Review policy order and scope before enabling allow policies.",
+      "validation_method": "Policy order review and negative test.",
+      "severity": "critical",
+      "verification_status": "design_rule_from_confirmed_model"
+    },
+    {
+      "limitation_key": "api_inline_model_divergence",
+      "title": "API and inline controls use different object models",
+      "description": "Inline Real-time Protection and API Data Protection use overlapping but distinct selectors, actions, resources, and workflows.",
+      "impact": "Translator must not reuse inline fields blindly for API policies or vice versa.",
+      "affected_objects": [
+        "real_time_protection_policy",
+        "api_data_protection_policy",
+        "actions",
+        "activities"
+      ],
+      "recommended_warning": "Execution mode must be selected before mapping fields.",
+      "validation_method": "Check execution_mode and vendor surface in translated output.",
+      "severity": "high",
+      "verification_status": "confirmed_public_docs"
+    }
+  ],
+  "prerequisites": [
+    {
+      "requirement_key": "traffic_steering_configured",
+      "title": "Traffic steering configured",
+      "description": "Target traffic must be steered to Netskope for inline Real-time Protection evaluation.",
+      "applies_to": [
+        "inline_real_time"
+      ],
+      "why_it_matters": "Unsteered traffic cannot be inspected or enforced by inline policies.",
+      "validation_method": "Review steering configuration and connection/app event logs.",
+      "blocks_verification_if_missing": true,
+      "severity": "critical"
+    },
+    {
+      "requirement_key": "ssl_inspection_enabled",
+      "title": "SSL inspection/decryption enabled where required",
+      "description": "Content DLP requires visibility into traffic/content; DND exceptions can suppress inspection.",
+      "applies_to": [
+        "inline_real_time",
+        "dlp"
+      ],
+      "why_it_matters": "Without inspection, post/upload data may not be evaluated.",
+      "validation_method": "Review SSL policy and test sample upload/prompt.",
+      "blocks_verification_if_missing": true,
+      "severity": "critical"
+    },
+    {
+      "requirement_key": "app_activity_support_verified",
+      "title": "App activity support verified",
+      "description": "Selected app/category must support the translated activities.",
+      "applies_to": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "why_it_matters": "A policy selecting unsupported activities will not enforce as expected.",
+      "validation_method": "Use tenant activity support view or run positive activity test.",
+      "blocks_verification_if_missing": true,
+      "severity": "high"
+    },
+    {
+      "requirement_key": "customer_app_category_mapping",
+      "title": "Customer app/category mapping exists",
+      "description": "Governance categories must map to real Netskope app categories/app lists/custom categories for exact translation.",
+      "applies_to": [
+        "destination_scope",
+        "vendor_translation"
+      ],
+      "why_it_matters": "Generic Generative AI mapping is lossy and may over/under-scope policies.",
+      "validation_method": "Verify org_vendor_object_mappings for app categories.",
+      "blocks_verification_if_missing": false,
+      "severity": "high"
+    },
+    {
+      "requirement_key": "dlp_profile_created",
+      "title": "DLP profile created and referenced",
+      "description": "Content detection policies require an existing DLP profile/rule structure.",
+      "applies_to": [
+        "dlp",
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "why_it_matters": "Policy cannot enforce content detection without a detector profile.",
+      "validation_method": "Check DLP profile name/ID in tenant and run positive test.",
+      "blocks_verification_if_missing": true,
+      "severity": "high"
+    },
+    {
+      "requirement_key": "notification_template_created",
+      "title": "Notification/coaching template created",
+      "description": "Coach, user alert, block with justification, or acknowledgement workflows require configured templates.",
+      "applies_to": [
+        "workflow",
+        "actions"
+      ],
+      "why_it_matters": "User-facing behavior cannot match the intended decision without a template.",
+      "validation_method": "Verify template exists and contains required user action/justification fields.",
+      "blocks_verification_if_missing": "for_coach_or_justification_policies",
+      "severity": "medium"
+    },
+    {
+      "requirement_key": "policy_order_reviewed",
+      "title": "Policy order reviewed",
+      "description": "Netskope policy order can affect which policy/profile/action applies first.",
+      "applies_to": [
+        "inline_real_time",
+        "api_data_protection"
+      ],
+      "why_it_matters": "Higher-priority allow/bypass policies may suppress intended controls.",
+      "validation_method": "Review translated policy order and test negative/positive cases.",
+      "blocks_verification_if_missing": true,
+      "severity": "high"
+    },
+    {
+      "requirement_key": "app_instance_mapping_verified",
+      "title": "App instance mapping verified",
+      "description": "App instance/tenant mapping is required for exact personal vs enterprise separation.",
+      "applies_to": [
+        "app_instance",
+        "approved_use"
+      ],
+      "why_it_matters": "User-based allow may accidentally permit personal/consumer instances if not separated.",
+      "validation_method": "Verify app instance selector and test enterprise vs personal login.",
+      "blocks_verification_if_missing": "for_instance_specific_policies",
+      "severity": "high"
+    },
+    {
+      "requirement_key": "forensic_profile_configured",
+      "title": "Forensic profile configured if evidence is required",
+      "description": "Evidence preservation requires forensic/evidence storage settings where used.",
+      "applies_to": [
+        "evidence",
+        "dlp"
+      ],
+      "why_it_matters": "Policy may block/alert without preserving expected forensic evidence.",
+      "validation_method": "Verify forensic profile and incident evidence download path.",
+      "blocks_verification_if_missing": "when_preserve_evidence_required",
+      "severity": "medium"
+    },
+    {
+      "requirement_key": "api_connector_enabled",
+      "title": "API connector enabled for SaaS/API scanning",
+      "description": "Out-of-band API Data Protection requires connected SaaS application/API integration.",
+      "applies_to": [
+        "api_data_protection"
+      ],
+      "why_it_matters": "API policies cannot scan resources without an enabled connector.",
+      "validation_method": "Check API connector status and scan event generation.",
+      "blocks_verification_if_missing": true,
+      "severity": "critical"
+    }
+  ],
+  "test_requirements": [
+    {
+      "test_key": "inline_access_block_test",
+      "title": "Inline access block validation",
+      "applies_to": [
+        "govern_app_access",
+        "inline_real_time"
+      ],
+      "severity": "critical",
+      "test_step": "Attempt browse/login/access to a destination in the blocked app category.",
+      "expected_result": "Access is blocked or controlled according to the translated Netskope action, and the expected event/log is visible.",
+      "evidence_to_capture": [
+        "screenshot_of_block_or_notification",
+        "policy_name",
+        "activity",
+        "application",
+        "user",
+        "timestamp",
+        "event_or_incident_id"
+      ]
+    },
+    {
+      "test_key": "inline_upload_dlp_positive_test",
+      "title": "Inline upload DLP positive test",
+      "applies_to": [
+        "upload",
+        "dlp",
+        "inline_real_time"
+      ],
+      "severity": "critical",
+      "test_step": "Upload a synthetic file containing matching DLP content to the scoped app/category.",
+      "expected_result": "Translated DLP profile matches and configured action occurs.",
+      "evidence_to_capture": [
+        "incident_id",
+        "dlp_policy",
+        "dlp_profile",
+        "dlp_rule",
+        "activity",
+        "object_name",
+        "action_taken",
+        "user_notification"
+      ]
+    },
+    {
+      "test_key": "inline_post_formpost_dlp_positive_test",
+      "title": "Inline post/formpost DLP positive test",
+      "applies_to": [
+        "post",
+        "formpost",
+        "dlp",
+        "inline_real_time"
+      ],
+      "severity": "high",
+      "test_step": "Submit synthetic sensitive content through a prompt/form/post activity in the scoped app.",
+      "expected_result": "DLP evaluates the submission and the configured action occurs.",
+      "evidence_to_capture": [
+        "activity",
+        "app",
+        "policy_name",
+        "dlp_profile",
+        "action_taken",
+        "incident_id"
+      ]
+    },
+    {
+      "test_key": "label_detection_test",
+      "title": "Sensitivity label detection test",
+      "applies_to": [
+        "classification_label",
+        "file_profile",
+        "upload"
+      ],
+      "severity": "high",
+      "test_step": "Upload a correctly labelled test file matching the configured sensitivity label.",
+      "expected_result": "File Profile/sensitivity label condition matches and expected policy action occurs.",
+      "evidence_to_capture": [
+        "label_name",
+        "label_instance",
+        "activity",
+        "policy_name",
+        "action_taken",
+        "incident_id"
+      ]
+    },
+    {
+      "test_key": "filename_pattern_test",
+      "title": "Filename pattern detection test",
+      "applies_to": [
+        "filename_pattern",
+        "file_profile",
+        "upload"
+      ],
+      "severity": "high",
+      "test_step": "Upload a file whose name matches the configured filename/file profile pattern.",
+      "expected_result": "Filename/file profile condition matches without triggering broad content-only policy behavior.",
+      "evidence_to_capture": [
+        "file_name",
+        "file_profile",
+        "policy_name",
+        "activity",
+        "action_taken"
+      ]
+    },
+    {
+      "test_key": "generic_genai_scope_negative_test",
+      "title": "GenAI category scope negative test",
+      "applies_to": [
+        "destination_scope",
+        "genai_category_mapping"
+      ],
+      "severity": "high",
+      "test_step": "Attempt activity against an app outside the intended governance category.",
+      "expected_result": "Policy does not trigger for out-of-scope app if customer app-category mapping is exact.",
+      "evidence_to_capture": [
+        "application",
+        "category",
+        "policy_name",
+        "triggered_or_not_triggered",
+        "timestamp"
+      ]
+    },
+    {
+      "test_key": "policy_order_negative_test",
+      "title": "Policy order and allow-bypass negative test",
+      "applies_to": [
+        "policy_order",
+        "allow",
+        "bypass"
+      ],
+      "severity": "critical",
+      "test_step": "Test a blocked/controlled sample when higher-priority allow policies are present.",
+      "expected_result": "Higher-priority allow policy does not bypass required DLP control unless intentionally scoped.",
+      "evidence_to_capture": [
+        "policy_order_screenshot",
+        "triggered_policy",
+        "action_taken",
+        "sample_result"
+      ]
+    },
+    {
+      "test_key": "api_genai_response_test",
+      "title": "API GenAI response/resource test",
+      "applies_to": [
+        "response",
+        "api_data_protection",
+        "genai"
+      ],
+      "severity": "medium",
+      "test_step": "Generate or update an AI prompt/response resource in a supported enterprise GenAI API integration.",
+      "expected_result": "API Data Protection detects the resource type only where vendor/app support is verified.",
+      "evidence_to_capture": [
+        "resource_type",
+        "activity_type",
+        "application",
+        "policy_name",
+        "scan_result",
+        "incident_id"
+      ]
+    },
+    {
+      "test_key": "forensic_evidence_test",
+      "title": "Forensic evidence preservation test",
+      "applies_to": [
+        "forensic_profile",
+        "evidence"
+      ],
+      "severity": "medium",
+      "test_step": "Trigger a DLP policy requiring evidence preservation and verify forensic/original file availability.",
+      "expected_result": "Forensic content or original file can be retrieved according to configured profile.",
+      "evidence_to_capture": [
+        "incident_id",
+        "forensic_profile",
+        "download_available",
+        "object_name"
+      ]
+    }
+  ]
+}

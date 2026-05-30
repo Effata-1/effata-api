@@ -1,8 +1,9 @@
 import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction } from '../types'
 import { validateNeutralPolicy } from '../../neutral-policies/schema'
+import { NETSKOPE_CATALOG, CATALOG_VERSION } from '../catalogs/netskope.catalog'
 
-export const ADAPTER_VERSION = '3.0.0'
+export const ADAPTER_VERSION = '3.1.0'
 
 function toNetskopeAction(effataAction: string): string {
   switch (effataAction) {
@@ -86,6 +87,161 @@ function generateDescription(
   }
 }
 
+// ── Catalog helpers ───────────────────────────────────────────────────────────
+
+/** Map Effata/NPJ action code → Netskope catalog action_key */
+function toCatalogActionKey(effataAction: string): string {
+  if (effataAction.startsWith('coach')) return 'user_alert'
+  if (effataAction === 'block')   return 'block'
+  if (effataAction === 'alert')   return 'alert'
+  return 'allow'
+}
+
+/**
+ * Enrich the mapping report arrays using the Netskope vendor catalog.
+ * Called at the end of translate() once all local variables are settled.
+ */
+function applyCatalogEnrichment(params: {
+  npjActivityKeys:  string[]
+  activities:       string[]   // translated Netskope activity names (e.g. 'Browse', 'Upload')
+  mostRestrictive:  string
+  dlpProfileCount:  number
+  scopeAllApps:     boolean
+  scopeAppIds:      string[]
+  intentTag:        string
+  shouldEmitAllow:  boolean
+  preserveEvidence: boolean
+  hasLabelCondition: boolean
+  lossyMappings:    string[]
+  unsupportedIntent: string[]
+  unverifiedAreas:  string[]
+  testsRequired:    string[]
+}): void {
+  const {
+    npjActivityKeys, activities, mostRestrictive, dlpProfileCount,
+    scopeAllApps, scopeAppIds, intentTag, shouldEmitAllow, preserveEvidence,
+    hasLabelCondition, lossyMappings, unsupportedIntent, unverifiedAreas, testsRequired,
+  } = params
+
+  const hasDlp      = dlpProfileCount > 0
+  const actLower    = activities.map(a => a.toLowerCase())
+  const execMode    = 'inline_real_time'
+
+  // ── A. Activity warnings ──────────────────────────────────────────────────
+  // formpost / prompt_submit → requires_dlp: true in catalog
+  if (npjActivityKeys.includes('prompt_submit') || npjActivityKeys.includes('post')) {
+    const entry = NETSKOPE_CATALOG.activities.find(a => a.activity_key === 'formpost')
+    if (entry) {
+      if (entry.requires_dlp === true && !hasDlp) {
+        lossyMappings.push(
+          'Formpost/prompt-submit activity requires a DLP profile in Netskope for GenAI prompt inspection — add a DLP profile to this policy.',
+        )
+      }
+      if (entry.limitations.length > 0) unverifiedAreas.push(entry.limitations[0])
+    }
+  }
+
+  // response activity → catalog says api_data_protection only (inline not universally verified)
+  if (npjActivityKeys.includes('response')) {
+    const entry = NETSKOPE_CATALOG.activities.find(a => a.activity_key === 'response')
+    if (entry && !entry.execution_modes.includes(execMode)) {
+      unsupportedIntent.push(
+        `AI response inspection is not supported for inline Real-time Protection in Netskope. ` +
+        (entry.limitations[0] ?? 'Validate per app and control plane.'),
+      )
+    }
+  }
+
+  // browse special event behavior — access control policies need this noted
+  if (npjActivityKeys.includes('browse') || npjActivityKeys.includes('login')) {
+    const entry = NETSKOPE_CATALOG.activities.find(a => a.activity_key === 'browse')
+    if (entry && entry.event_emission_behavior === 'special_case' && entry.limitations.length > 0) {
+      unverifiedAreas.push(entry.limitations[0])
+    }
+  }
+
+  // ── B. Action constraints ─────────────────────────────────────────────────
+  // quarantine: only valid for upload activity with a DLP profile
+  if (mostRestrictive === 'quarantine' || intentTag === 'quarantine') {
+    const entry = NETSKOPE_CATALOG.actions.find(a => a.action_key === 'quarantine')
+    if (entry) {
+      lossyMappings.push(...entry.limitations)
+      if (!actLower.includes('upload')) {
+        lossyMappings.push('Quarantine requires Upload activity — ensure the policy includes Upload in its activity selector.')
+      }
+    }
+  }
+
+  // encryption: requires app_instance + upload
+  if (mostRestrictive === 'encryption' || intentTag === 'encryption') {
+    const entry = NETSKOPE_CATALOG.actions.find(a => a.action_key === 'encryption')
+    if (entry) lossyMappings.push(...entry.limitations)
+  }
+
+  // For the primary action, surface any action-level limitations not already covered
+  const primaryCatalogAction = NETSKOPE_CATALOG.actions.find(a => a.action_key === toCatalogActionKey(mostRestrictive))
+  if (primaryCatalogAction) {
+    for (const lim of primaryCatalogAction.limitations) {
+      if (!lossyMappings.includes(lim) && !unverifiedAreas.includes(lim)) {
+        unverifiedAreas.push(lim)
+      }
+    }
+  }
+
+  // ── C. Cross-cutting limitation warnings (critical/high) ──────────────────
+  const skipLimitations = new Set<string>([
+    'api_inline_model_divergence',    // only relevant when mixing inline+API intentionally
+    ...(npjActivityKeys.includes('response') ? [] : ['genai_response_not_universal_inline']),
+    ...(scopeAllApps || scopeAppIds.length === 0 ? [] : ['generic_genai_category_mapping_lossy']),
+  ])
+
+  for (const lim of NETSKOPE_CATALOG.limitations) {
+    if (lim.severity !== 'critical' && lim.severity !== 'high') continue
+    if (skipLimitations.has(lim.limitation_key)) continue
+    // ssl_dnd / certificate pinning — only surface when DLP inspection is expected
+    if (['ssl_dnd_bypasses_inspection', 'certificate_pinned_apps'].includes(lim.limitation_key) && !hasDlp) continue
+    const warning = `[${lim.severity.toUpperCase()}] ${lim.recommended_warning}`
+    if (!unverifiedAreas.includes(warning) && !lossyMappings.includes(warning)) {
+      unverifiedAreas.push(warning)
+    }
+  }
+
+  // ── D. Prerequisite-driven test requirements ──────────────────────────────
+  for (const prereq of NETSKOPE_CATALOG.prerequisites) {
+    if (prereq.blocks_verification_if_missing !== true) continue
+    if (!prereq.applies_to.some(t => [execMode, 'inline_real_time', 'dlp', 'destination_scope', 'vendor_translation'].includes(t))) continue
+    // Skip DLP prereqs when no DLP profile is in the policy
+    if (['dlp_profile_created', 'ssl_inspection_enabled'].includes(prereq.requirement_key) && !hasDlp) continue
+    // Skip API connector prereq for inline policies
+    if (prereq.requirement_key === 'api_connector_enabled') continue
+    testsRequired.push(
+      `[Prerequisite — ${prereq.severity.toUpperCase()}] ${prereq.title}: ${prereq.description} Validation: ${prereq.validation_method}`,
+    )
+  }
+
+  // ── E. Structured catalog test requirements ───────────────────────────────
+  const catalogTestMatches = NETSKOPE_CATALOG.test_requirements.filter(t => {
+    const tags = t.applies_to
+    if (tags.includes(intentTag)) return true
+    if (t.test_key === 'inline_upload_dlp_positive_test' && actLower.includes('upload') && hasDlp) return true
+    if (t.test_key === 'inline_post_formpost_dlp_positive_test' && (actLower.includes('post') || actLower.includes('formpost')) && hasDlp) return true
+    if (t.test_key === 'policy_order_negative_test' && shouldEmitAllow) return true
+    if (t.test_key === 'forensic_evidence_test' && preserveEvidence) return true
+    if (t.test_key === 'label_detection_test' && hasLabelCondition) return true
+    if (t.test_key === 'generic_genai_scope_negative_test' && (scopeAllApps || scopeAppIds.length === 0)) return true
+    return false
+  })
+
+  for (const t of catalogTestMatches) {
+    const evidence = t.evidence_to_capture.length > 0
+      ? ` Evidence: ${t.evidence_to_capture.join(', ')}.`
+      : ''
+    testsRequired.push(
+      `[Catalog ${t.severity.toUpperCase()}] ${t.title}: ${t.test_step} → ${t.expected_result}${evidence}`,
+    )
+  }
+}
+
 export function translate(
   policy: NeutralPolicy,
   _registry: VendorCapabilityRegistry,
@@ -96,6 +252,9 @@ export function translate(
   const unverifiedAreas: string[]   = []
   const testsRequired: string[]     = []
   const nativePolicies: object[]    = []
+  // Hoisted for catalog enrichment — populated as the function progresses
+  const npjActivityKeys: string[]   = []
+  let   hasLabelCondition           = false
 
   // ── Neutral policy JSON — use as primary source when valid ────────────────
   const npj = policy.neutral_policy_json
@@ -132,6 +291,9 @@ export function translate(
   let mostRestrictive: string
 
   if (npj) {
+    // Capture raw NPJ activity keys for catalog enrichment
+    npjActivityKeys.push(...(npj.scope.activities ?? []))
+
     // npj-first: activities come directly from structured scope — no guessing
     // browse + login map to Netskope "Browse" — blocks URL-level access (govern_app_access use case)
     if (npj.scope.activities.includes('browse') || npj.scope.activities.includes('login')) activities.push('Browse')
@@ -200,9 +362,8 @@ export function translate(
 
   if (npj && npj.content.conditions.length > 0) {
     // npj-first: build profiles from typed conditions
-    const dtSensitivities = new Set<string>()
-    let hasLabelCondition = false
-    let hasFilenameCondition = false
+    const dtSensitivities    = new Set<string>()
+    let   hasFilenameCondition = false
 
     for (const cond of npj.content.conditions) {
       if (cond.type === 'data_type') {
@@ -363,9 +524,28 @@ export function translate(
     'Validate Netskope app category "Generative AI" covers all target AI apps in your tenant.',
   )
 
+  // ── Catalog enrichment ────────────────────────────────────────────────────
+  applyCatalogEnrichment({
+    npjActivityKeys,
+    activities,
+    mostRestrictive,
+    dlpProfileCount:   dlpProfiles.length,
+    scopeAllApps:      policy.scope_all_apps,
+    scopeAppIds:       policy.scope_app_ids,
+    intentTag:         npj ? npj.intent : (policy.policy_type ?? 'unknown'),
+    shouldEmitAllow,
+    preserveEvidence:  npj?.decision.preserve_evidence ?? false,
+    hasLabelCondition,
+    lossyMappings,
+    unsupportedIntent,
+    unverifiedAreas,
+    testsRequired,
+  })
+
   return {
-    vendor:  'netskope',
-    status:  lossyMappings.length > 0 ? 'partial' : 'success',
+    vendor:          'netskope',
+    catalog_version: CATALOG_VERSION,
+    status:          lossyMappings.length > 0 || unsupportedIntent.length > 0 ? 'partial' : 'success',
     native_policies: nativePolicies,
     mapping_report: {
       exact_mappings:          exactMappings,
