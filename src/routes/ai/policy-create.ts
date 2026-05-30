@@ -282,6 +282,21 @@ router.post('/', async (req, res, next) => {
     return
   }
 
+  // Normalize govern_app_access before validation — AI sometimes generates wrong activities.
+  // This is a domain rule, not a validation error: force browse+login and clear conditions.
+  if (proposalObj && typeof proposalObj === 'object') {
+    const p = proposalObj as Record<string, unknown>
+    const npj = p.npj as Record<string, unknown> | undefined
+    if (npj && npj.intent === 'govern_app_access') {
+      const scope = (npj.scope ?? {}) as Record<string, unknown>
+      scope.activities = ['browse', 'login']
+      npj.scope = scope
+      const content = (npj.content ?? {}) as Record<string, unknown>
+      content.conditions = []
+      npj.content = content
+    }
+  }
+
   const validation = validatePolicyProposal(proposalObj)
   if (validation.valid) {
     void logAiRun({ orgId: ctx.orgId, userId: ctx.userId, agent: 'policy-create', runType: 'user', status: 'completed', inputTokens, outputTokens, latencyMs: Date.now() - start })
