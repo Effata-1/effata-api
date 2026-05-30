@@ -24,7 +24,7 @@ export async function backfillNeutralPolicies(
   ] = await Promise.all([
     client
       .from('org_genai_governance_categories')
-      .select('id, system_tag, name, active')
+      .select('id, system_tag, name, active, access_posture')
       .eq('org_id', orgId),
 
     client

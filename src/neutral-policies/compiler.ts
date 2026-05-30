@@ -13,10 +13,11 @@ export const COMPILER_VERSION = '1.0.0'
 // ── Input types ───────────────────────────────────────────────────────────────
 
 export interface GovernanceCategoryRow {
-  id:         string
-  system_tag: string | null
-  name:       string
-  active:     boolean
+  id:              string
+  system_tag:      string | null
+  name:            string
+  active:          boolean
+  access_posture?: string   // 'allow' | 'block'; absent = derive from system_tag
 }
 
 export interface ControlMatrixOverrideRow {
@@ -263,7 +264,10 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
   // with Conditions, Approved) allow access — DLP controls fire on data activities, not at
   // the access level. The old heuristic (generate access block if any data cell = Block) was
   // semantically wrong: a Block in a data cell means "block this data type", not "block the app".
-  const accessBlockCats = activeCats.filter(c => c.system_tag === 'prohibited')
+  const getPosture = (c: GovernanceCategoryRow) =>
+    c.access_posture ?? (c.system_tag === 'prohibited' ? 'block' : 'allow')
+
+  const accessBlockCats = activeCats.filter(c => getPosture(c) === 'block')
 
   for (const cat of accessBlockCats) {
     const policyKey = `genai-app-access-${cat.system_tag ?? cat.id}`
@@ -287,7 +291,7 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
 
   // ── B. Content Detection (pp| rows) ──────────────────────────────────────
   // Prohibited apps are blocked at access level (section A) — data policies never fire for them.
-  const contentDetectionCats = activeCats.filter(c => c.system_tag !== 'prohibited')
+  const contentDetectionCats = activeCats.filter(c => getPosture(c) !== 'block')
 
   // Group by (system_level, action): combine categories sharing the same action into one policy.
   for (const lbl of [...activeLabels].sort((a, b) =>

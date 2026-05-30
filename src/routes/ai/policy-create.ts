@@ -10,9 +10,10 @@ const router = Router()
 const contextSchema = z.object({
   intents:    z.array(z.string()).optional(),
   categories: z.array(z.object({
-    id:         z.string(),
-    name:       z.string(),
-    system_tag: z.string().nullable(),
+    id:             z.string(),
+    name:           z.string(),
+    system_tag:     z.string().nullable(),
+    access_posture: z.string().optional(),
   })).optional(),
   dataTypes: z.array(z.object({
     key:         z.string(),
@@ -47,7 +48,7 @@ function buildSystemPrompt(ctx: Required<PolicyContext>): string {
 
   const categoriesBlock = ctx.categories.length
     ? ctx.categories.map(c => {
-        const posture = c.system_tag === 'prohibited' ? 'block' : 'allow'
+        const posture = c.access_posture ?? (c.system_tag === 'prohibited' ? 'block' : 'allow')
         const note = posture === 'block'
           ? 'Access is BLOCKED at browse+login. Use govern_app_access intent ONLY. Do NOT add data detection policies for this category.'
           : 'Access is ALLOWED. Use data detection intents (prevent_exfiltration, detect_only, coach_user). Do NOT use govern_app_access for this category.'
