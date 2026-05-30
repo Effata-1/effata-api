@@ -93,6 +93,9 @@ npj = {
   "intent": <one of the valid intents below>,
   "policy_family": string,
   "scope": {
+    "users": ["All Users"],            // default; infer from request if a specific group is mentioned
+                                        // e.g., "HR users" → ["HR"], "Finance team" → ["Finance"]
+                                        // Use plain display names only. Multiple groups allowed.
     "activities": [<canonical activity keys only>],
     "channels": ["genai"],             // ALWAYS ["genai"] — Effata GenAI channel
     "app_categories": [{ "id": "...", "system_tag": "...", "name": "..." }]
@@ -296,13 +299,19 @@ router.post('/', async (req, res, next) => {
   if (proposalObj && typeof proposalObj === 'object') {
     const p = proposalObj as Record<string, unknown>
     const npj = p.npj as Record<string, unknown> | undefined
-    if (npj && npj.intent === 'govern_app_access') {
+    if (npj) {
       const scope = (npj.scope ?? {}) as Record<string, unknown>
-      scope.activities = ['browse', 'login']
+      // Default users to All Users if not specified
+      if (!Array.isArray(scope.users) || (scope.users as unknown[]).length === 0) {
+        scope.users = ['All Users']
+      }
       npj.scope = scope
-      const content = (npj.content ?? {}) as Record<string, unknown>
-      content.conditions = []
-      npj.content = content
+      if (npj.intent === 'govern_app_access') {
+        scope.activities = ['browse', 'login']
+        const content = (npj.content ?? {}) as Record<string, unknown>
+        content.conditions = []
+        npj.content = content
+      }
     }
   }
 
@@ -345,15 +354,20 @@ router.post('/', async (req, res, next) => {
     if (repairedObj !== undefined) {
       // Apply the same normalization to the repaired object as we did to the original.
       if (typeof repairedObj === 'object' && repairedObj !== null) {
-        const rp  = repairedObj as Record<string, unknown>
+        const rp   = repairedObj as Record<string, unknown>
         const rNpj = rp.npj as Record<string, unknown> | undefined
-        if (rNpj && rNpj.intent === 'govern_app_access') {
-          const rScope   = (rNpj.scope   ?? {}) as Record<string, unknown>
-          const rContent = (rNpj.content ?? {}) as Record<string, unknown>
-          rScope.activities   = ['browse', 'login']
-          rContent.conditions = []
-          rNpj.scope   = rScope
-          rNpj.content = rContent
+        if (rNpj) {
+          const rScope = (rNpj.scope ?? {}) as Record<string, unknown>
+          if (!Array.isArray(rScope.users) || (rScope.users as unknown[]).length === 0) {
+            rScope.users = ['All Users']
+          }
+          rNpj.scope = rScope
+          if (rNpj.intent === 'govern_app_access') {
+            const rContent = (rNpj.content ?? {}) as Record<string, unknown>
+            rScope.activities   = ['browse', 'login']
+            rContent.conditions = []
+            rNpj.content        = rContent
+          }
         }
       }
 
