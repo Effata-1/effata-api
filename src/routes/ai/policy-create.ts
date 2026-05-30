@@ -324,7 +324,7 @@ router.post('/', async (req, res, next) => {
     inputTokens:  inputTokens + repairInputTokens,
     outputTokens: outputTokens + repairOutputTokens,
     latencyMs:    Date.now() - start,
-    error:        repaired ? undefined : `repair ${repaired ? 'succeeded' : 'failed'}: ${validation.errors.join('; ')}`,
+    error:        repaired ? undefined : `repair failed: ${validation.errors.join('; ')}`,
   })
 
   res.end()
