@@ -46,7 +46,13 @@ function buildSystemPrompt(ctx: Required<PolicyContext>): string {
   const activitiesBlock = ctx.activities.join(', ')
 
   const categoriesBlock = ctx.categories.length
-    ? ctx.categories.map(c => `  - id: "${c.id}", name: "${c.name}", system_tag: ${JSON.stringify(c.system_tag)}`).join('\n')
+    ? ctx.categories.map(c => {
+        const posture = c.system_tag === 'prohibited' ? 'block' : 'allow'
+        const note = posture === 'block'
+          ? 'Access is BLOCKED at browse+login. Use govern_app_access intent ONLY. Do NOT add data detection policies for this category.'
+          : 'Access is ALLOWED. Use data detection intents (prevent_exfiltration, detect_only, coach_user). Do NOT use govern_app_access for this category.'
+        return `  - id: "${c.id}", name: "${c.name}", system_tag: ${JSON.stringify(c.system_tag)}, access_posture: "${posture}" — ${note}`
+      }).join('\n')
     : '  (none configured — leave scope.app_categories as [])'
 
   const dataTypesBlock = ctx.dataTypes.length
@@ -156,6 +162,8 @@ govern_app_access rule:
   - Activities MUST be EXACTLY ["browse", "login"] — NEVER include post, prompt_submit, upload, download, response
   - content.conditions MUST be [] — no data scanning; blocked at access level before any data activity
   - content.operator must be "any"
+  - ONLY use govern_app_access for categories where access_posture = "block" (currently: Prohibited only)
+  - NEVER use govern_app_access for categories where access_posture = "allow" (Restricted, Approved with Conditions, Approved)
   - Use when: user wants to block/allow/restrict an app entirely (e.g. "block DeepSeek", "block prohibited AI tools", "allow Copilot for all users")
 
 ## Available categories (use only these IDs in scope.app_categories)

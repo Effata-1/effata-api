@@ -257,60 +257,32 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
   const outputs: CompilerPolicyOutput[] = []
   let priority = 1
 
-  // ── A. App Access Control — Prohibited (always) ──────────────────────────
-  const prohibitedCat = activeCats.find(c => c.system_tag === 'prohibited')
-  if (prohibitedCat) {
-    const policyKey = 'genai-app-access-prohibited'
+  // ── A. App Access Control ────────────────────────────────────────────────
+  // Only generate govern_app_access policies for categories where access is blocked at the
+  // browse+login level. In V1 this is Prohibited only. Other categories (Restricted, Approved
+  // with Conditions, Approved) allow access — DLP controls fire on data activities, not at
+  // the access level. The old heuristic (generate access block if any data cell = Block) was
+  // semantically wrong: a Block in a data cell means "block this data type", not "block the app".
+  const accessBlockCats = activeCats.filter(c => c.system_tag === 'prohibited')
+
+  for (const cat of accessBlockCats) {
+    const policyKey = `genai-app-access-${cat.system_tag ?? cat.id}`
     const npj = buildNeutralPolicy(
       policyKey,
-      'GenAI — Prohibited Apps — Block Access',
-      'Block all access to prohibited GenAI apps.',
+      `GenAI — ${cat.name} — Block Access`,
+      `Block all access to ${cat.name} GenAI apps.`,
       policyKey,
       'GenAI App Access Control',
-      [toAppCategory(prohibitedCat)],
+      [toAppCategory(cat)],
       APP_ACCESS_ACTIVITIES,
       CHANNELS_APP_ACCESS,
       [],
       'block',
       'secret',
-      [`app-access::prohibited::${prohibitedCat.id}`],
+      [`app-access::${cat.system_tag ?? cat.id}::${cat.id}`],
       [],
     )
     outputs.push(wrapOutput(npj, 'prohibited', null, false, [], priority++))
-  }
-
-  // ── A. App Access Control — Restricted/Unassessed (only if restrictive override) ──
-  const restrictedCat = activeCats.find(c => c.system_tag === 'permitted-with-restriction')
-  if (restrictedCat) {
-    // Only generate if there's at least one restrictive matrix cell for this category
-    const hasRestrictiveOverride = controlMatrixOverrides.some(
-      o => o.category_id === restrictedCat.id &&
-        (ACTION_RANK[o.action_code] ?? 0) >= ACTION_RANK['coach']
-    )
-    if (hasRestrictiveOverride) {
-      const topAction = mostRestrictive(
-        controlMatrixOverrides
-          .filter(o => o.category_id === restrictedCat.id)
-          .map(o => o.action_code)
-      )
-      const policyKey = 'genai-app-access-restricted'
-      const npj = buildNeutralPolicy(
-        policyKey,
-        'GenAI — Restricted / Unassessed Apps — Access Control',
-        'Control access to restricted or unassessed GenAI apps based on configured matrix actions.',
-        policyKey,
-        'GenAI App Access Control',
-        [toAppCategory(restrictedCat)],
-        APP_ACCESS_ACTIVITIES,
-        CHANNELS_APP_ACCESS,
-        [],
-        topAction,
-        'secret',
-        [`app-access::permitted-with-restriction::${restrictedCat.id}`],
-        [],
-      )
-      outputs.push(wrapOutput(npj, 'data-handling', null, false, [], priority++))
-    }
   }
 
   // ── B. Content Detection (pp| rows) ──────────────────────────────────────
