@@ -119,7 +119,17 @@ npj = {
 ${intentsBlock}
 
 ## Valid decision.mode values (pick exactly one)
-  ${actionsBlock}
+  allow    — permit the action without restriction
+  monitor  — log silently, no user notification
+  alert    — log and notify the security team, no user disruption
+  coach    — SOFT control: show a guidance message; user CAN still proceed after acknowledging
+  block    — HARD control: action is completely prevented; user CANNOT bypass
+
+  ⚠ CRITICAL distinction:
+  - "block" = hard stop, no bypass. Use this when the user says "block", "prevent", "deny", "prohibit".
+  - "coach" = soft nudge, user can proceed. Use ONLY when the request explicitly asks for a warning or guidance WITHOUT a hard stop.
+  - "block with a coaching message" → mode "block" (NOT "coach"). Block mode can still display a message to the user.
+  - Do NOT use "coach" when the user intent is to prevent the action entirely.
 
   ⚠ NEVER use "coach-ack" or "coach-just" in decision.mode.
   For coach with acknowledgement: use mode "coach" + require_acknowledgement: true
