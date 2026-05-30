@@ -1,4 +1,4 @@
-import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
+import type { NeutralPolicy, OrgVendorObjectMapping, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction, actionToSeverity } from '../types'
 import { validateNeutralPolicy } from '../../neutral-policies/schema'
 
@@ -8,6 +8,7 @@ export const ADAPTER_VERSION = '1.0.0'
 export function translate(
   policy: NeutralPolicy,
   _registry: VendorCapabilityRegistry,
+  _mappings: OrgVendorObjectMapping[] = [],
 ): TranslationResult {
   const exactMappings: string[]     = []
   const lossyMappings: string[]     = []
@@ -163,16 +164,18 @@ export function translate(
   const hasLossy = lossyMappings.length > 0
 
   return {
-    vendor:          'forcepoint-dlp',
-    catalog_version: '',
-    status:          hasLossy ? 'partial' : 'success',
-    native_policies: [nativePolicy],
+    vendor:                   'forcepoint-dlp',
+    catalog_version:          '',
+    customer_mapping_version: '',
+    status:                   hasLossy ? 'partial' : 'success',
+    native_policies:          [nativePolicy],
     mapping_report: {
-      exact_mappings:          exactMappings,
-      lossy_mappings:          lossyMappings,
-      unsupported_intent:      unsupportedIntent,
-      unverified_vendor_areas: unverifiedAreas,
-      tests_required:          testsRequired,
+      exact_mappings:            exactMappings,
+      lossy_mappings:            lossyMappings,
+      unsupported_intent:        unsupportedIntent,
+      unverified_vendor_areas:   unverifiedAreas,
+      tests_required:            testsRequired,
+      customer_mapping_required: [],
     },
   }
 }

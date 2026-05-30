@@ -1,9 +1,10 @@
-import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
+import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry, OrgVendorObjectMapping } from '../types'
 import { resolveAction } from '../types'
 import { validateNeutralPolicy } from '../../neutral-policies/schema'
 import { NETSKOPE_CATALOG, CATALOG_VERSION } from '../catalogs/netskope.catalog'
+import { findMapping } from '../customer-mappings'
 
-export const ADAPTER_VERSION = '3.1.0'
+export const ADAPTER_VERSION = '4.0.0'
 
 function toNetskopeAction(effataAction: string): string {
   switch (effataAction) {
@@ -243,18 +244,21 @@ function applyCatalogEnrichment(params: {
 }
 
 export function translate(
-  policy: NeutralPolicy,
+  policy:    NeutralPolicy,
   _registry: VendorCapabilityRegistry,
+  mappings:  OrgVendorObjectMapping[] = [],
 ): TranslationResult {
-  const exactMappings: string[]     = []
-  const lossyMappings: string[]     = []
-  const unsupportedIntent: string[] = []
-  const unverifiedAreas: string[]   = []
-  const testsRequired: string[]     = []
-  const nativePolicies: object[]    = []
+  const exactMappings: string[]           = []
+  const lossyMappings: string[]           = []
+  const unsupportedIntent: string[]       = []
+  const unverifiedAreas: string[]         = []
+  const testsRequired: string[]           = []
+  const customerMappingRequired: string[] = []
+  const nativePolicies: object[]          = []
   // Hoisted for catalog enrichment — populated as the function progresses
-  const npjActivityKeys: string[]   = []
-  let   hasLabelCondition           = false
+  const npjActivityKeys: string[]         = []
+  let   hasLabelCondition                 = false
+  let   hasMissingDestMapping             = false
 
   // ── Neutral policy JSON — use as primary source when valid ────────────────
   const npj = policy.neutral_policy_json
@@ -273,18 +277,8 @@ export function translate(
     'source defaulted to "All Users" — remap to specific user groups or OUs in Netskope console before enabling.',
   )
 
-  // Destination category/apps
-  let destTarget: Record<string, string | string[]>
-  if (policy.scope_all_apps) {
-    destTarget = { category: 'Generative AI' }
-    exactMappings.push('scope_all_apps → destination category: Generative AI')
-  } else if (policy.scope_app_ids.length > 0) {
-    destTarget = { specific_apps: policy.scope_app_ids }
-    exactMappings.push('scope_app_ids → destination specific_apps')
-  } else {
-    destTarget = { category: 'Generative AI' }
-    lossyMappings.push('No specific apps scoped — destination defaulted to Generative AI category. Define specific app instances in Netskope if needed.')
-  }
+  // Destination category/apps — resolved below; placeholder until NPJ app_categories are processed
+  let destTarget: Record<string, string | string[]> = { category: 'Generative AI' }
 
   // ── Activities and primary action ─────────────────────────────────────────
   const activities: string[] = []
@@ -315,8 +309,57 @@ export function translate(
     if (npj.decision.preserve_evidence) {
       exactMappings.push('npj.decision.preserve_evidence → Save Evidence enabled')
     }
+
+    // Destination — use npj.scope.app_categories with customer mappings
+    const appCategories = npj.scope.app_categories ?? []
+    if (appCategories.length > 0) {
+      const mappedNames: string[] = []
+      for (const cat of appCategories) {
+        const key = cat.system_tag ?? cat.id
+        const lookup = findMapping({ mappings, neutral_object_type: 'app_category', neutral_object_key: key })
+        if (lookup.not_applicable) continue
+        if (lookup.found && lookup.mapping) {
+          mappedNames.push(lookup.mapping.vendor_object_name)
+          if (lookup.quality === 'exact') {
+            exactMappings.push(`app_category [${key}] → "${lookup.mapping.vendor_object_name}" (verified)`)
+          } else if (lookup.quality === 'lossy') {
+            lossyMappings.push(lookup.warning!)
+          } else {
+            unverifiedAreas.push(lookup.warning!)
+          }
+        } else {
+          hasMissingDestMapping = true
+          customerMappingRequired.push(lookup.warning!)
+          // Placeholder — do NOT silently substitute "Generative AI" for a specific category
+          mappedNames.push(`[PLACEHOLDER: map ${key} in Vendor Mapping]`)
+        }
+      }
+      destTarget = mappedNames.length === 1
+        ? { category: mappedNames[0] }
+        : { categories: mappedNames }
+    } else if (policy.scope_all_apps) {
+      destTarget = { category: 'Generative AI' }
+      exactMappings.push('scope_all_apps → destination category: Generative AI')
+    } else if (policy.scope_app_ids.length > 0) {
+      destTarget = { specific_apps: policy.scope_app_ids }
+      exactMappings.push('scope_app_ids → destination specific_apps')
+    } else {
+      destTarget = { category: 'Generative AI' }
+      lossyMappings.push('No app categories or specific apps scoped — destination defaulted to Generative AI category.')
+    }
   } else {
-    // Legacy path: resolve from rules/primary_action
+    // Legacy path — destination + activities from rules/primary_action
+    if (policy.scope_all_apps) {
+      destTarget = { category: 'Generative AI' }
+      exactMappings.push('scope_all_apps → destination category: Generative AI')
+    } else if (policy.scope_app_ids.length > 0) {
+      destTarget = { specific_apps: policy.scope_app_ids }
+      exactMappings.push('scope_app_ids → destination specific_apps')
+    } else {
+      destTarget = { category: 'Generative AI' }
+      lossyMappings.push('No specific apps scoped — destination defaulted to Generative AI category. Define specific app instances in Netskope if needed.')
+    }
+
     const postPromptAction = resolveAction(policy, 'post_prompt')
     const uploadAction     = resolveAction(policy, 'upload')
     const downloadAction   = resolveAction(policy, 'download')
@@ -382,16 +425,30 @@ export function translate(
       }
     }
 
+    // Use customer mappings for sensitivity → DLP profile
     for (const sensitivity of dtSensitivities) {
-      dlpProfiles.push(dlpProfileName(sensitivity))
-    }
-
-    if (dtSensitivities.size > 0) {
-      for (const sensitivity of dtSensitivities) {
-        exactMappings.push(`npj.content.conditions[type=data_type, sensitivity=${sensitivity}] → DLP profile: ${dlpProfileName(sensitivity)}`)
+      const lookup = findMapping({ mappings, neutral_object_type: 'sensitivity_level', neutral_object_key: sensitivity })
+      if (lookup.not_applicable) {
+        // Intentionally skipped
+      } else if (lookup.found && lookup.mapping) {
+        dlpProfiles.push(lookup.mapping.vendor_object_name)
+        if (lookup.quality === 'exact') {
+          exactMappings.push(`npj.content.conditions[sensitivity=${sensitivity}] → DLP profile: "${lookup.mapping.vendor_object_name}" (verified)`)
+        } else if (lookup.quality === 'lossy') {
+          lossyMappings.push(lookup.warning!)
+          testsRequired.push(`Verify DLP profile "${lookup.mapping.vendor_object_name}" covers "${sensitivity}" data patterns in Netskope.`)
+        } else {
+          unverifiedAreas.push(lookup.warning!)
+          testsRequired.push(`Verify DLP profile "${lookup.mapping.vendor_object_name}" exists in Netskope (Policies → DLP Profiles).`)
+        }
+      } else {
+        customerMappingRequired.push(lookup.warning!)
+        dlpProfiles.push(dlpProfileName(sensitivity))  // placeholder only
+        lossyMappings.push(`Using placeholder DLP profile name "${dlpProfileName(sensitivity)}" for "${sensitivity}" — configure exact profile name in Vendor Mapping.`)
         testsRequired.push(`Create or verify DLP profile "${dlpProfileName(sensitivity)}" exists in Netskope (Policies → DLP Profiles).`)
       }
     }
+
     if (hasLabelCondition) {
       lossyMappings.push('Classification label conditions require tenant-specific enterprise-classification profile in Netskope — cannot be auto-created.')
       unverifiedAreas.push('Public-doc parity for enterprise classification label conditions in Netskope.')
@@ -400,27 +457,43 @@ export function translate(
       lossyMappings.push('Filename detection conditions — Netskope filename-based DLP is a separate capability; verify tenant support before enabling.')
     }
   } else if (!npj) {
-    // Legacy fallback
+    // Legacy fallback — try customer mappings for sensitivity levels, then fall back to inferred names
     const { profiles: legacyProfiles, source: profileSource } = inferDlpProfiles(policy)
-    dlpProfiles = legacyProfiles
 
-    if (profileSource === 'label') {
-      exactMappings.push(`data_classification_label → DLP profile: ${dlpProfiles[0]} (must exist in Netskope tenant)`)
-      testsRequired.push(
-        `Create or verify DLP profile "${dlpProfiles[0]}" exists in Netskope (Policies → DLP Profiles) and matches the data patterns for "${policy.data_classification_label}".`,
-      )
+    if (profileSource === 'label' && policy.data_classification_label && policy.data_classification_label !== 'all') {
+      const sensitivity = policy.data_classification_label
+      const lookup = findMapping({ mappings, neutral_object_type: 'sensitivity_level', neutral_object_key: sensitivity })
+      if (lookup.not_applicable) {
+        // skip
+      } else if (lookup.found && lookup.mapping) {
+        dlpProfiles.push(lookup.mapping.vendor_object_name)
+        if (lookup.quality === 'exact') {
+          exactMappings.push(`data_classification_label → DLP profile: "${lookup.mapping.vendor_object_name}" (verified)`)
+        } else {
+          unverifiedAreas.push(lookup.warning!)
+          testsRequired.push(`Verify DLP profile "${lookup.mapping.vendor_object_name}" exists in Netskope.`)
+        }
+      } else {
+        customerMappingRequired.push(lookup.warning!)
+        dlpProfiles = legacyProfiles
+        lossyMappings.push(`Using placeholder DLP profile name "${legacyProfiles[0]}" — configure exact profile name in Vendor Mapping.`)
+        testsRequired.push(`Create or verify DLP profile "${legacyProfiles[0]}" exists in Netskope (Policies → DLP Profiles).`)
+      }
     } else if (profileSource === 'rules') {
+      // For rule-based profiles, keep legacy names and note as placeholders
+      dlpProfiles = legacyProfiles
       for (const p of dlpProfiles) {
-        testsRequired.push(
-          `Create or verify DLP profile "${p}" exists in Netskope (Policies → DLP Profiles) covering the relevant data patterns from this policy's rules.`,
-        )
+        testsRequired.push(`Create or verify DLP profile "${p}" exists in Netskope (Policies → DLP Profiles).`)
       }
       lossyMappings.push(
         `DLP profiles inferred from rule data_types (${dlpProfiles.join(', ')}) — no data_classification_label set. ` +
-        `Verify these profile names match your Netskope tenant configuration.`,
+        `Verify these profile names match your Netskope tenant or configure exact names in Vendor Mapping.`,
       )
     } else {
-      lossyMappings.push('No DLP profile configured — this policy acts on ALL content for the specified activities. Add a DLP profile in Netskope if content inspection is required.')
+      dlpProfiles = legacyProfiles
+      if (dlpProfiles.length === 0) {
+        lossyMappings.push('No DLP profile configured — this policy acts on ALL content for the specified activities. Add a DLP profile in Netskope if content inspection is required.')
+      }
     }
 
     if (policy.rules.some(r => r.data_type.startsWith('clabel:'))) {
@@ -429,15 +502,25 @@ export function translate(
     }
   }
 
-  // Notification template for coach
-  const notificationTemplate: string | null = mostRestrictive.startsWith('coach')
-    ? 'EFFATA-COACH-NOTIFICATION'
-    : null
-  if (notificationTemplate) {
-    exactMappings.push('coach → notification_template: EFFATA-COACH-NOTIFICATION')
-    testsRequired.push(
-      'Create or verify user notification template "EFFATA-COACH-NOTIFICATION" in Netskope (Policies → User Notifications).',
-    )
+  // Notification template for coach — use customer mapping
+  let notificationTemplate: string | null = null
+  if (mostRestrictive.startsWith('coach')) {
+    const tplLookup = findMapping({ mappings, neutral_object_type: 'notification_template', neutral_object_key: 'default-coach' })
+    if (tplLookup.not_applicable) {
+      // coaching notification explicitly disabled — no template
+    } else if (tplLookup.found && tplLookup.mapping) {
+      notificationTemplate = tplLookup.mapping.vendor_object_name
+      if (tplLookup.quality === 'exact') {
+        exactMappings.push(`coach → notification_template: "${notificationTemplate}" (verified)`)
+      } else {
+        unverifiedAreas.push(tplLookup.warning!)
+        testsRequired.push(`Verify user notification template "${notificationTemplate}" exists in Netskope (Policies → User Notifications).`)
+      }
+    } else {
+      customerMappingRequired.push(tplLookup.warning!)
+      notificationTemplate = 'EFFATA-COACH-NOTIFICATION'  // placeholder
+      testsRequired.push('Create or verify user notification template "EFFATA-COACH-NOTIFICATION" in Netskope (Policies → User Notifications).')
+    }
   }
 
   exactMappings.push('primary_action → profile action')
@@ -470,6 +553,11 @@ export function translate(
     ? npj.intent === 'allow_approved_use' || npj.exceptions.some(e => e.effect === 'allow')
     : (policy.policy_type === 'approved-use' || policy.primary_action === 'allow')
 
+  // Placeholder fields added when destination mapping is missing (policy is not deployment-ready)
+  const placeholderFields = hasMissingDestMapping
+    ? { _deployment_ready: false, _notes: 'Placeholder — configure Netskope app category mappings in Vendor Mapping before deploying.' }
+    : {}
+
   if (shouldEmitAllow) {
     const allowActivities = npj
       ? activities   // already correctly set from npj.scope.activities
@@ -495,6 +583,7 @@ export function translate(
       group:          '1. Header Policies',
       policy_type:    'Cloud App Access',
       policy_family:  'Real-time Protection',
+      ...placeholderFields,
     })
     exactMappings.push(npj ? 'npj.intent allow_approved_use → Allow action' : 'approved-use → Allow action')
     testsRequired.push(
@@ -518,11 +607,12 @@ export function translate(
     group:          policyGroup(primaryNativeAction),
     policy_type:    'Cloud App Access',
     policy_family:  'Real-time Protection',
+    ...placeholderFields,
   })
 
-  testsRequired.push(
-    'Validate Netskope app category "Generative AI" covers all target AI apps in your tenant.',
-  )
+  if (!hasMissingDestMapping) {
+    testsRequired.push('Validate Netskope app category or destination covers all target AI apps in your tenant.')
+  }
 
   // ── Catalog enrichment ────────────────────────────────────────────────────
   applyCatalogEnrichment({
@@ -542,17 +632,27 @@ export function translate(
     testsRequired,
   })
 
+  // Status: block app_access with missing destination → deferred (not deployment-ready)
+  const isBlockWithMissingDest = hasMissingDestMapping
+    && (policy.policy_type === 'app_access' || npj?.intent === 'govern_app_access')
+    && (primaryNativeAction === 'Block' || (npj?.decision.mode === 'block'))
+
   return {
-    vendor:          'netskope',
-    catalog_version: CATALOG_VERSION,
-    status:          lossyMappings.length > 0 || unsupportedIntent.length > 0 ? 'partial' : 'success',
+    vendor:                   'netskope',
+    catalog_version:          CATALOG_VERSION,
+    customer_mapping_version: '',  // set by translateForVendor after passing mappings
+    status: isBlockWithMissingDest          ? 'deferred'
+      : customerMappingRequired.length > 0  ? 'partial'
+      : lossyMappings.length > 0 || unsupportedIntent.length > 0 ? 'partial'
+      : 'success',
     native_policies: nativePolicies,
     mapping_report: {
-      exact_mappings:          exactMappings,
-      lossy_mappings:          lossyMappings,
-      unsupported_intent:      unsupportedIntent,
-      unverified_vendor_areas: unverifiedAreas,
-      tests_required:          testsRequired,
+      exact_mappings:            exactMappings,
+      lossy_mappings:            lossyMappings,
+      unsupported_intent:        unsupportedIntent,
+      unverified_vendor_areas:   unverifiedAreas,
+      tests_required:            testsRequired,
+      customer_mapping_required: customerMappingRequired,
     },
   }
 }

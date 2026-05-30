@@ -1,21 +1,50 @@
 export type MappingQuality = 'exact' | 'lossy' | 'split_required' | 'unsupported' | 'unverified'
 
 export interface MappingReport {
-  exact_mappings: string[]
-  lossy_mappings: string[]
-  unsupported_intent: string[]
-  unverified_vendor_areas: string[]
-  tests_required: string[]
+  exact_mappings:            string[]
+  lossy_mappings:            string[]
+  unsupported_intent:        string[]
+  unverified_vendor_areas:   string[]
+  tests_required:            string[]
+  customer_mapping_required: string[]  // missing tenant mappings that block exact translation
 }
 
 export interface TranslationResult {
-  vendor:           string
+  vendor:                   string
   /** success = fully mapped; partial = translated but lossy/unverified; deferred = vendor not supported */
-  status:           'success' | 'partial' | 'deferred'
-  /** Vendor catalog version used at translation time — stored in capability_registry_version. Empty string for non-catalog vendors. */
-  catalog_version:  string
-  native_policies:  object[]
-  mapping_report:   MappingReport
+  status:                   'success' | 'partial' | 'deferred'
+  /** Vendor catalog version used at translation time. Empty string for non-catalog vendors. */
+  catalog_version:          string
+  /** Hash of org mappings used at translation time — empty string if no mappings loaded. */
+  customer_mapping_version: string
+  native_policies:          object[]
+  mapping_report:           MappingReport
+}
+
+export interface OrgVendorObjectMapping {
+  id:                          string
+  org_id:                      string
+  vendor_id:                   string
+  neutral_object_type:         string
+  neutral_object_key:          string
+  neutral_object_display_name: string | null
+  vendor_object_type:          string
+  vendor_object_key:           string | null
+  vendor_object_name:          string
+  vendor_object_id:            string | null
+  vendor_console_path:         string | null
+  mapping_purpose:             'destination_scope' | 'detection_profile' | 'notification' | 'exception' | 'evidence' | 'policy_order'
+  mapping_quality:             'exact' | 'lossy' | 'customer_verified' | 'customer_mapping_required' | 'not_applicable' | 'unverified'
+  verification_status:         'unverified' | 'verified' | 'needs_review' | 'stale' | 'invalid'
+  is_active:                   boolean
+  not_applicable:              boolean
+  not_applicable_reason:       string | null
+  verified:                    boolean
+  verified_by:                 string | null
+  verified_at:                 string | null
+  verification_note:           string | null
+  updated_at:                  string
+  metadata:                    Record<string, unknown>
 }
 
 export interface PolicyRule {

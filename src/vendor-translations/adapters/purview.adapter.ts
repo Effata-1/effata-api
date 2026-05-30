@@ -1,4 +1,4 @@
-import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from '../types'
+import type { NeutralPolicy, OrgVendorObjectMapping, TranslationResult, VendorCapabilityRegistry } from '../types'
 import { resolveAction } from '../types'
 import { validateNeutralPolicy } from '../../neutral-policies/schema'
 
@@ -8,6 +8,7 @@ export const ADAPTER_VERSION = '1.0.0'
 export function translate(
   policy: NeutralPolicy,
   _registry: VendorCapabilityRegistry,
+  _mappings: OrgVendorObjectMapping[] = [],
 ): TranslationResult {
   const exactMappings: string[]     = []
   const lossyMappings: string[]     = []
@@ -166,16 +167,18 @@ export function translate(
   exactMappings.push('block → Block action across all locations')
 
   return {
-    vendor:          'microsoft-purview',
-    catalog_version: '',
-    status:          'partial',
-    native_policies: nativePolicies,
+    vendor:                   'microsoft-purview',
+    catalog_version:          '',
+    customer_mapping_version: '',
+    status:                   'partial',
+    native_policies:          nativePolicies,
     mapping_report: {
-      exact_mappings:          exactMappings,
-      lossy_mappings:          lossyMappings,
-      unsupported_intent:      unsupportedIntent,
-      unverified_vendor_areas: unverifiedAreas,
-      tests_required:          testsRequired,
+      exact_mappings:            exactMappings,
+      lossy_mappings:            lossyMappings,
+      unsupported_intent:        unsupportedIntent,
+      unverified_vendor_areas:   unverifiedAreas,
+      tests_required:            testsRequired,
+      customer_mapping_required: [],
     },
   }
 }

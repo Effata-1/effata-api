@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry } from './types'
+import type { NeutralPolicy, TranslationResult, VendorCapabilityRegistry, OrgVendorObjectMapping } from './types'
 import * as netskope  from './adapters/netskope.adapter'
 import * as purview   from './adapters/purview.adapter'
 import * as forcepoint from './adapters/forcepoint.adapter'
@@ -7,7 +7,11 @@ import * as skyhigh   from './adapters/skyhigh.adapter'
 
 type AdapterModule = {
   ADAPTER_VERSION: string
-  translate: (policy: NeutralPolicy, registry: VendorCapabilityRegistry) => TranslationResult
+  translate: (
+    policy:   NeutralPolicy,
+    registry: VendorCapabilityRegistry,
+    mappings: OrgVendorObjectMapping[],
+  ) => TranslationResult
 }
 
 const ADAPTERS: Record<string, AdapterModule> = {
@@ -29,6 +33,7 @@ export function computePolicyHash(policy: NeutralPolicy): string {
     scope_app_ids:             [...policy.scope_app_ids].sort(),
     policy_type:               policy.policy_type,
     rules:                     [...policy.rules].sort((a, b) => a.data_type.localeCompare(b.data_type)),
+    neutral_policy_json:       policy.neutral_policy_json ?? null,
   })
   return crypto.createHash('sha256').update(stable).digest('hex').slice(0, 16)
 }
@@ -38,9 +43,11 @@ export function computePolicyHash(policy: NeutralPolicy): string {
  * Returns the TranslationResult plus metadata for storage.
  */
 export function translateForVendor(
-  policy: NeutralPolicy,
-  vendorId: string,
-  registry: VendorCapabilityRegistry,
+  policy:                NeutralPolicy,
+  vendorId:              string,
+  registry:              VendorCapabilityRegistry,
+  mappings:              OrgVendorObjectMapping[] = [],
+  customerMappingVersion = '',
 ): {
   result: TranslationResult
   adapterVersion: string
@@ -51,16 +58,18 @@ export function translateForVendor(
   if (!adapter) {
     return {
       result: {
-        vendor:          vendorId,
-        catalog_version: '',
-        status:          'deferred',
-        native_policies: [],
+        vendor:                   vendorId,
+        catalog_version:          '',
+        customer_mapping_version: '',
+        status:                   'deferred',
+        native_policies:          [],
         mapping_report: {
-          exact_mappings:          [],
-          lossy_mappings:          [],
-          unsupported_intent:      [],
-          unverified_vendor_areas: [`No adapter available for vendor: ${vendorId}`],
-          tests_required:          [],
+          exact_mappings:            [],
+          lossy_mappings:            [],
+          unsupported_intent:        [],
+          unverified_vendor_areas:   [`No adapter available for vendor: ${vendorId}`],
+          tests_required:            [],
+          customer_mapping_required: [],
         },
       },
       adapterVersion:  '0.0.0',
@@ -69,7 +78,8 @@ export function translateForVendor(
     }
   }
 
-  const result = adapter.translate(policy, registry)
+  const result = adapter.translate(policy, registry, mappings)
+  result.customer_mapping_version = customerMappingVersion
 
   return {
     result,

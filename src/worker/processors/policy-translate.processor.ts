@@ -1,6 +1,7 @@
 import { serviceClient } from '../../lib/supabase'
 import { normalizeVendorTool, loadRegistries, FIRST_WAVE_VENDOR_IDS } from '../../vendor-translations/registry'
 import { translateForVendor, adapterStatusToDbStatus } from '../../vendor-translations/translate'
+import { getOrgVendorMappings, computeMappingVersion } from '../../vendor-translations/customer-mappings'
 import type { NeutralPolicy } from '../../vendor-translations/types'
 import type { ProcessorContext } from '../job-config'
 
@@ -56,8 +57,19 @@ export async function policyTranslateProcessor(
     }
   }
 
-  // Step 3: Load capability registries for relevant vendors
-  const registries = await loadRegistries(vendorIds)
+  // Step 3: Load capability registries + customer object mappings for relevant vendors
+  const [registries, allMappings] = await Promise.all([
+    loadRegistries(vendorIds),
+    Promise.all(
+      vendorIds.map(async vid => ({
+        vendorId: vid,
+        mappings: await getOrgVendorMappings(orgId, vid),
+      }))
+    ),
+  ])
+
+  const mappingsByVendor       = new Map(allMappings.map(m => [m.vendorId, m.mappings]))
+  const mappingVersionByVendor = new Map(allMappings.map(m => [m.vendorId, computeMappingVersion(m.mappings)]))
 
   const total = policies.length * vendorIds.length
   let processed = 0
@@ -77,8 +89,11 @@ export async function policyTranslateProcessor(
       }
 
       try {
+        const vendorMappings        = mappingsByVendor.get(vendorId) ?? []
+        const customerMappingVersion = mappingVersionByVendor.get(vendorId) ?? ''
+
         const { result, adapterVersion, registryVersion, policyHash } =
-          translateForVendor(policy, vendorId, registry)
+          translateForVendor(policy, vendorId, registry, vendorMappings, customerMappingVersion)
 
         const dbStatus = adapterStatusToDbStatus(result.status)
 
@@ -95,6 +110,8 @@ export async function policyTranslateProcessor(
               neutral_policy_hash:         policyHash,
               native_policies:             result.native_policies,
               mapping_report:              result.mapping_report,
+              customer_mapping_version:    result.customer_mapping_version,
+              translated_at:               new Date().toISOString(),
               // Reset review state on re-translation — previous review was for previous output
               reviewed_by:   null,
               reviewed_at:   null,
