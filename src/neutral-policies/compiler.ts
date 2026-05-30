@@ -119,7 +119,9 @@ const SYSTEM_LEVEL_PRIORITY: Record<string, number> = {
 const CONTENT_DETECTION_ACTIVITIES: NeutralActivity[] = ['post', 'upload']
 const LABEL_DETECTION_ACTIVITIES: NeutralActivity[]   = ['upload']
 const FILENAME_DETECTION_ACTIVITIES: NeutralActivity[] = ['upload']
-const APP_ACCESS_ACTIVITIES: NeutralActivity[]        = ['browse', 'post', 'upload', 'download']
+// App access control happens at Browse and Login — data activities are not relevant here.
+// Prohibited and restricted apps that are blocked at access level never reach data activities.
+const APP_ACCESS_ACTIVITIES: NeutralActivity[]        = ['browse', 'login']
 const APPROVED_USE_ACTIVITIES: NeutralActivity[]      = ['browse', 'post', 'upload']
 
 // ── Compiler ──────────────────────────────────────────────────────────────────
@@ -186,9 +188,12 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
     warnings: string[],
   ): NeutralPolicyV1 {
     const decision  = actionToDecision(actionCode, sensitivity)
-    const intent    = appCategories.some(c => c.system_tag === 'prohibited') && conditions.length === 0
-      ? 'govern_app_access'
-      : actionCode === 'allow' ? 'allow_approved_use' : actionToIntent(actionCode)
+    // govern_app_access: any policy with no content conditions (access-level decision)
+    // allow_approved_use: explicit allow with no conditions
+    // data intent: derived from action when conditions are present
+    const intent    = conditions.length === 0
+      ? (actionCode === 'allow' ? 'allow_approved_use' : 'govern_app_access')
+      : actionToIntent(actionCode)
 
     return {
       schema_version: '1.0',
@@ -309,6 +314,9 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
   }
 
   // ── B. Content Detection (pp| rows) ──────────────────────────────────────
+  // Prohibited apps are blocked at access level (section A) — data policies never fire for them.
+  const contentDetectionCats = activeCats.filter(c => c.system_tag !== 'prohibited')
+
   // Group by (system_level, action): combine categories sharing the same action into one policy.
   for (const lbl of [...activeLabels].sort((a, b) =>
     (SYSTEM_LEVEL_PRIORITY[a.system_level] ?? 9) - (SYSTEM_LEVEL_PRIORITY[b.system_level] ?? 9)
@@ -316,7 +324,7 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
     const dataType = `pp|${lbl.id}`
     // Map: action → [categories with that action]
     const actionToCats = new Map<string, GovernanceCategoryRow[]>()
-    for (const cat of activeCats) {
+    for (const cat of contentDetectionCats) {
       const action = getCellAction(dataType, cat.id, cat.system_tag, lbl.system_level, PP_DEFAULTS)
       if (action === 'not-set' || action === 'allow') continue
       const list = actionToCats.get(action) ?? []
@@ -325,7 +333,7 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
     }
 
     for (const [actionCode, cats] of actionToCats) {
-      const allCats = activeCats.length > 0 && cats.length === activeCats.length
+      const allCats = contentDetectionCats.length > 0 && cats.length === contentDetectionCats.length
       const conditions: DataTypeCondition[] = inScopeDataTypes
         .filter(dt => dt.system_level === lbl.system_level)
         .map(dt => ({
@@ -369,9 +377,9 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
   // ── C. Label Detection (ul|dc| rows) ─────────────────────────────────────
   for (const clbl of activeCustomerLabels) {
     const dataType = `ul|dc|clabel:${clbl.id}`
-    // Most restrictive action across all governance categories
+    // Excluded prohibited — blocked at access level, data policies don't apply
     const actionCode = mostRestrictive(
-      activeCats.map(cat => {
+      contentDetectionCats.map(cat => {
         const explicit = overrideMap.get(`${dataType}::${cat.id}`)
         if (explicit !== undefined) return explicit
         const sysLevel = clbl.system_level ?? 'confidential'
@@ -418,8 +426,9 @@ export function compileNeutralPoliciesForOrg(input: CompilerInput): CompilerPoli
     if (!matchingLabel) continue
 
     const dataType = `ul|fn|${matchingLabel.id}`
+    // Excluded prohibited — blocked at access level, data policies don't apply
     const actionCode = mostRestrictive(
-      activeCats.map(cat => {
+      contentDetectionCats.map(cat => {
         const explicit = overrideMap.get(`${dataType}::${cat.id}`)
         if (explicit !== undefined) return explicit
         return (cat.system_tag && UL_FN_DEFAULTS[cat.system_tag]?.[level]) ?? 'not-set'

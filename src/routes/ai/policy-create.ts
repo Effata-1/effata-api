@@ -151,7 +151,12 @@ For classification_label conditions (MIP, TITUS, custom labels):
 For filename conditions:
   { "type": "filename", "name": "<description>", "pattern": "<glob or keyword pattern>", "sensitivity": "<level>" }
 
-govern_app_access rule: when intent is "govern_app_access", content.conditions MUST be [] and content.operator must be "any".
+govern_app_access rule:
+  - "govern_app_access" = app-level access decision (block / allow / restrict entry to the app itself)
+  - Activities MUST be EXACTLY ["browse", "login"] — NEVER include post, prompt_submit, upload, download, response
+  - content.conditions MUST be [] — no data scanning; blocked at access level before any data activity
+  - content.operator must be "any"
+  - Use when: user wants to block/allow/restrict an app entirely (e.g. "block DeepSeek", "block prohibited AI tools", "allow Copilot for all users")
 
 ## Available categories (use only these IDs in scope.app_categories)
 ${categoriesBlock}

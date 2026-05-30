@@ -173,6 +173,7 @@ export async function genaiRefreshProcessor(ctx: ProcessorContext): Promise<Reco
 
     await serviceClient.from('genai_research_runs').update({
       completed_at: new Date().toISOString(),
+      apps_checked: allApps.length,
       apps_updated: appsUpdated,
       apps_added:   appsAdded,
       errors,

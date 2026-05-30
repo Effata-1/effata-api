@@ -9,7 +9,7 @@ export type NeutralPolicyIntent =
   | 'govern_app_access'      // app-level access control — no content detection
 
 export type NeutralActivity =
-  | 'browse' | 'upload' | 'download' | 'share' | 'post'
+  | 'browse' | 'login' | 'upload' | 'download' | 'share' | 'post'
   | 'copy_paste' | 'print' | 'move' | 'delete' | 'email_send' | 'prompt_submit'
 
 export type NeutralChannel =

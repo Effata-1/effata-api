@@ -57,9 +57,19 @@ export function validateNeutralPolicy(npj: unknown): NpjValidationResult {
   }
 
   const scope = (n.scope ?? {}) as Record<string, unknown>
-  for (const a of (scope.activities ?? []) as unknown[]) {
+  const activities = (scope.activities ?? []) as unknown[]
+  for (const a of activities) {
     if (!VALID_ACTIVITIES.includes(a as typeof VALID_ACTIVITIES[number])) {
       errors.push(`Invalid activity: "${a}"`)
+    }
+  }
+
+  // govern_app_access: activities must be exactly browse + login
+  if (n.intent === 'govern_app_access') {
+    const APP_ACCESS_ONLY = ['browse', 'login']
+    const invalid = activities.filter(a => !APP_ACCESS_ONLY.includes(a as string))
+    if (invalid.length > 0) {
+      errors.push(`govern_app_access activities must be ["browse", "login"] only. Remove: ${invalid.join(', ')}`)
     }
   }
 
