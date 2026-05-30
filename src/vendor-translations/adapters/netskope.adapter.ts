@@ -4,7 +4,7 @@ import { validateNeutralPolicy } from '../../neutral-policies/schema'
 import { NETSKOPE_CATALOG, CATALOG_VERSION } from '../catalogs/netskope.catalog'
 import { findMapping } from '../customer-mappings'
 
-export const ADAPTER_VERSION = '4.0.0'
+export const ADAPTER_VERSION = '4.0.1'
 
 function toNetskopeAction(effataAction: string): string {
   switch (effataAction) {
@@ -597,7 +597,7 @@ export function translate(
     : policy.data_classification_label ?? (dlpProfiles.length > 0 ? dlpProfiles[0].replace('EFFATA-', '').toLowerCase() : null)
 
   nativePolicies.push({
-    name:           `[DLP] ${policy.name}`,
+    name:           `${isProhibited ? '[Block]' : '[DLP]'} ${policy.name}`,
     description:    generateDescription(primaryNativeAction, activities, descLabel, destTarget),
     status:         'enabled',
     source,
