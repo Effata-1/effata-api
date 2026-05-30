@@ -133,6 +133,8 @@ export function translate(
 
   if (npj) {
     // npj-first: activities come directly from structured scope — no guessing
+    // browse + login map to Netskope "Browse" — blocks URL-level access (govern_app_access use case)
+    if (npj.scope.activities.includes('browse') || npj.scope.activities.includes('login')) activities.push('Browse')
     if (npj.scope.activities.includes('post') || npj.scope.activities.includes('prompt_submit')) activities.push('Post')
     if (npj.scope.activities.includes('upload'))   activities.push('Upload')
     if (npj.scope.activities.includes('download')) activities.push('Download')
@@ -144,7 +146,7 @@ export function translate(
       : decisionMode === 'coach' && npj.decision.require_acknowledgement              ? 'coach-ack'
       : decisionMode
 
-    exactMappings.push('npj.scope.activities → Netskope activities (exact, no inference)')
+    exactMappings.push('npj.scope.activities → Netskope activities (browse/login → Browse, post/prompt_submit → Post, upload → Upload, download → Download)')
     exactMappings.push('npj.decision.mode → Netskope action (exact, no inference)')
 
     // Preserve evidence note
@@ -286,6 +288,10 @@ export function translate(
   if (isProhibited) {
     primaryNativeAction = 'Block'
     exactMappings.push(npj ? 'npj.intent govern_app_access → action Block' : 'policy_type prohibited → action Block')
+    lossyMappings.push(
+      'govern_app_access (browse + login) maps to Netskope Browse activity — blocks all URL-level access to the app. ' +
+      'No DLP profile is needed; the Block action applies to all traffic matching the destination.',
+    )
   }
 
   // Profile & Action
