@@ -310,7 +310,7 @@ router.post('/', async (req, res, next) => {
       // Repair produced invalid JSON — fall through to error
     }
 
-    if (repairedObj) {
+    if (repairedObj !== undefined) {
       const repairValidation = validatePolicyProposal(repairedObj)
       if (repairValidation.valid) {
         res.write(`<policyProposalRepair>${JSON.stringify(repairedObj)}</policyProposalRepair>`)
