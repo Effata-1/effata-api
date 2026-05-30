@@ -305,6 +305,9 @@ router.post('/', async (req, res, next) => {
     }
   }
 
+  // Serialize normalized object so repair prompt receives already-correct activities/conditions.
+  const normalizedJson = JSON.stringify(proposalObj)
+
   const validation = validatePolicyProposal(proposalObj)
   if (validation.valid) {
     void logAiRun({ orgId: ctx.orgId, userId: ctx.userId, agent: 'policy-create', runType: 'user', status: 'completed', inputTokens, outputTokens, latencyMs: Date.now() - start })
@@ -322,7 +325,7 @@ router.post('/', async (req, res, next) => {
     const repairMsg = await anthropic.messages.create({
       model:      MODEL,
       max_tokens: 2048,
-      messages:   [{ role: 'user', content: buildRepairPrompt(rawJson, validation.errors) }],
+      messages:   [{ role: 'user', content: buildRepairPrompt(normalizedJson, validation.errors) }],
     })
 
     repairInputTokens  = repairMsg.usage.input_tokens
@@ -339,6 +342,20 @@ router.post('/', async (req, res, next) => {
     }
 
     if (repairedObj !== undefined) {
+      // Apply the same normalization to the repaired object as we did to the original.
+      if (typeof repairedObj === 'object' && repairedObj !== null) {
+        const rp  = repairedObj as Record<string, unknown>
+        const rNpj = rp.npj as Record<string, unknown> | undefined
+        if (rNpj && rNpj.intent === 'govern_app_access') {
+          const rScope   = (rNpj.scope   ?? {}) as Record<string, unknown>
+          const rContent = (rNpj.content ?? {}) as Record<string, unknown>
+          rScope.activities   = ['browse', 'login']
+          rContent.conditions = []
+          rNpj.scope   = rScope
+          rNpj.content = rContent
+        }
+      }
+
       const repairValidation = validatePolicyProposal(repairedObj)
       if (repairValidation.valid) {
         res.write(`<policyProposalRepair>${JSON.stringify(repairedObj)}</policyProposalRepair>`)
