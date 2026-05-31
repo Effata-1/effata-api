@@ -114,7 +114,12 @@ npj = {
     "preserve_evidence": boolean,
     "create_incident": boolean
   },
-  "exceptions": [],                    // usually empty unless explicitly needed
+  "exceptions": [],                    // REQUIRED when user mentions "except X", "excluding X", "exempt X", or names a specific app/group to exclude
+                                      // Each entry: { "effect": "allow", "reason": "<what is exempted and why>" }
+                                      // ⚠ RULE: if the user request includes ANY exclusion, you MUST populate this array — never leave it empty if an exception was stated
+                                      // effect is almost always "allow" (the exception permits what the main policy blocks)
+                                      // Example: "block source code upload to all GenAI, except GitHub Copilot"
+                                      //   → { "effect": "allow", "reason": "GitHub Copilot is exempted — approved IDE-integrated developer workflow" }
   "provenance": {
     "generated_from": "ai-assisted",   // ALWAYS "ai-assisted"
     "source_model": "ai-policy-assistant",
@@ -177,6 +182,15 @@ govern_app_access rule:
   - ONLY use govern_app_access for categories where access_posture = "block" (currently: Prohibited only)
   - NEVER use govern_app_access for categories where access_posture = "allow" (Restricted, Approved with Conditions, Approved)
   - Use when: user wants to block/allow/restrict an app entirely (e.g. "block DeepSeek", "block prohibited AI tools", "allow Copilot for all users")
+
+## Exceptions rule (critical)
+
+If the user's request includes ANY exclusion — "except X", "excluding X", "not X", "exempt X", "allow X", "exclude Y":
+- ALWAYS populate npj.exceptions with at least one entry describing what is excluded
+- Do NOT put the exception only in the description or sourceImpact — it MUST appear in npj.exceptions
+- effect: "allow" = something is permitted that the main policy would otherwise block/restrict
+- reason: clear sentence naming the exempted app/group and the business justification
+- Example: "Block source code upload to GenAI – Except GitHub Copilot" → exceptions: [{ "effect": "allow", "reason": "GitHub Copilot is exempted — approved IDE-integrated developer workflow for engineers" }]
 
 ## Available categories (use only these IDs in scope.app_categories)
 ${categoriesBlock}
