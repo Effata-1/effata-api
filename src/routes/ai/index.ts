@@ -5,6 +5,7 @@ import runRouter from './run'
 import advisorRouter from './advisor'
 import policyChatRouter from './policy-chat'
 import policyCreateRouter from './policy-create'
+import coachingMessageRouter from './coaching-message'
 
 const router = Router()
 
@@ -15,5 +16,6 @@ router.use('/run', runRouter)
 router.use('/dlp-advisor', advisorRouter)
 router.use('/policy-chat', policyChatRouter)
 router.use('/policy-create', policyCreateRouter)
+router.use('/coaching-message', coachingMessageRouter)
 
 export default router

@@ -8,6 +8,7 @@ const envSchema = z.object({
   ALLOWED_ORIGINS:         z.string().min(1).default('http://localhost:3000'),
   SITE_URL:                z.string().url().optional(),
   CRON_API_KEY:            z.string().min(1),
+  INTERNAL_API_SECRET:     z.string().min(1).optional(),
   PORT:                    z.coerce.number().default(3001),
 })
 
