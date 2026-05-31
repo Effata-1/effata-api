@@ -152,14 +152,22 @@ ${intentsBlock}
 
 For data_type conditions:
   { "type": "data_type", "sensitivity": "<sensitivity>", "name": "<human name>", "confidence": "high" | "medium" }
-  - Prefer data types from the available data types list below
-  - If user requests a data type not in the list, include it but add a warning in provenance.warnings
+  - ALWAYS prefer data_type conditions — they are the primary detection mechanism.
+  - Prefer data types from the available data types list below.
+  - If a matching type is not in the list, still use data_type with a descriptive name and add a warning in provenance.warnings
+    (e.g. "No PCI data type in catalog — create a PCI DLP profile in Netskope using PAN regex + CVV + expiry patterns")
+  - For financial/PCI data: use data_type with name "PCI / Payment Card Data", sensitivity matching the request level.
+    Do NOT use regex or filenames for PCI unless the user explicitly asks.
 
-For classification_label conditions (MIP, TITUS, custom labels):
+For classification_label conditions:
   { "type": "classification_label", "label_name": "<name>", "sensitivity": "<level>" }
+  ⚠ ONLY add classification_label conditions when the user EXPLICITLY mentions labels, MIP, TITUS, or "classification".
+  Do NOT add them just because you think they might apply. Most policies do not need them.
 
 For filename conditions:
   { "type": "filename", "name": "<description>", "pattern": "<glob or keyword pattern>", "sensitivity": "<level>" }
+  ⚠ ONLY add filename conditions when the user EXPLICITLY mentions files, filenames, or file patterns.
+  Do NOT add them based on data type inference (e.g., do NOT add "*pci*" just because the policy is about PCI data).
 
 govern_app_access rule:
   - "govern_app_access" = app-level access decision (block / allow / restrict entry to the app itself)
